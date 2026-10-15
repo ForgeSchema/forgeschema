@@ -41,3 +41,7 @@ All six sessions completed on 2026-10-15. The command workflow and reproducible 
 ## Authorized follow-up: browser demo
 
 On 2026-10-15 the owner explicitly requested a browser demo after the completed prototype. Add an interactive static replay of the verified artifacts on the existing website: compare schemas, review SQL, inspect preserved rows and explore verification drift. Preserve the website theme/structure and contact, publish source and copied static assets, record validation and pause after the handoff. Live database connections/editing remain outside this follow-up.
+
+## Authorized license adoption
+
+On 2026-10-15 the owner selected Apache License 2.0 for the code and website repositories. Add canonical LICENSE and attribution notices, replace proprietary statements and reflect the license on the live site. Preserve third-party licenses and the website theme. No binary release or tag is implied.

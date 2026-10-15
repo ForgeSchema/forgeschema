@@ -19,4 +19,4 @@ Apply requires external DDL to be paused. ForgeSchema's advisory lock coordinate
 
 Inspect and verify read catalog metadata, not application rows. The separate demo harness reads its own synthetic rows to assert preservation. Verification is a snapshot of supported structures, not proof of application correctness or future state.
 
-All six prototype sessions are complete. Further features, licensing and release decisions require owner direction. Copyright 2026 ForgeSchema. All rights reserved.
+All six prototype sessions are complete. Further features and release decisions require owner direction. Copyright 2026 ForgeSchema. Licensed under the Apache License, Version 2.0; see LICENSE and THIRD_PARTY_NOTICES.md.

@@ -67,4 +67,4 @@ Without that variable, database tests explicitly skip. The GitHub Actions workfl
 
 Read PLAN.md for the six-session schedule, RESUME.md for current results and continuation instructions, and AGENTS.md for session rules. Every session ends with code and website updates, followed by a pause for the owner's go-ahead. Website content is maintained in photozeitgeist/forgeschema.com. The owner connected https://forgeschema.com/. All six sessions are complete; further work awaits owner direction.
 
-Copyright 2026 ForgeSchema. All rights reserved. No open-source license has been granted. Third-party dependency notices are in THIRD_PARTY_NOTICES.md.
+Copyright 2026 ForgeSchema. Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and third-party licenses.
