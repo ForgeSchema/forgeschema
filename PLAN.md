@@ -37,3 +37,7 @@ Reserve the last 20–30 minutes of every session for validation and handoff. Co
 
 ## Current state
 All six sessions completed on 2026-10-15. The command workflow and reproducible isolated customer walkthrough are implemented. Documentation includes command reference, capability matrix and actual CI artifacts. Website contact remains info@forgeschema.com. The prototype remains unreleased; stop and await owner direction for any further milestone. See RESUME.md for exact evidence and limits.
+
+## Authorized follow-up: browser demo
+
+On 2026-10-15 the owner explicitly requested a browser demo after the completed prototype. Add an interactive static replay of the verified artifacts on the existing website: compare schemas, review SQL, inspect preserved rows and explore verification drift. Preserve the website theme/structure and contact, publish source and copied static assets, record validation and pause after the handoff. Live database connections/editing remain outside this follow-up.

@@ -11,7 +11,7 @@ This unreleased prototype targets PostgreSQL 16/17. CI uses 16.10 and 17.6. The 
 | Artifact | Deterministic format 1 JSON, full source/target, fingerprints, quoted SQL, strict rebuild validation, plan ID | Arbitrary SQL execution, rename inference or partial execution of a blocked plan |
 | Apply | Transactional supported DDL, advisory coordination, source table locks, fresh drift check, target verification and atomic history | Online zero-downtime guarantees, concurrent index builds, backfills and general crash recovery |
 | Verify | Independent read-only supported structural comparison with deterministic differences | Data correctness, grants/comments, history auditing or automatic repair |
-| Delivery | Go CLI/API, reproducible synthetic walkthrough, PostgreSQL CI evidence | Browser application, MCP server, other database engines, published binaries or public release |
+| Delivery | Go CLI/API, reproducible synthetic walkthrough, interactive browser replay of real CI evidence | Connected database browser application, MCP server, other database engines, published binaries or public release |
 
 Read SCHEMA.md and INSPECTION.md for exact identifier, size and object rejection rules. Nullable additions apply to existing tables; new tables can contain required columns. Ordered primary-key and index columns are significant.
 

@@ -46,3 +46,16 @@ jobs:
           name: walkthrough-postgres-${{ matrix.postgres }}
           path: demo-output/
           if-no-files-found: ignore
+
+  browser-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check recorded demo data
+        run: python3 scripts/export-browser-demo.py --check
+      - name: Check demo interactions and downloads
+        run: node --test web/demo/demo.test.cjs
+      - run: node --check web/demo/demo.js

@@ -4,6 +4,8 @@ ForgeSchema is a PostgreSQL schema evolution engine written in Go. The workflow 
 
 The six-session prototype is complete. Inspect, plan, apply and independently verify supported PostgreSQL schemas. The reproducible walkthrough runs the compiled CLI against two populated synthetic customers, applies six operations and demonstrates stale-plan rejection and read-only drift detection.
 
+Explore the [interactive browser demo](https://forgeschema.com/demo/) to compare recorded schemas, review SQL, inspect preserved rows and switch between match/drift reports. It replays actual CLI evidence; it does not execute database changes. See [BROWSER_DEMO.md](BROWSER_DEMO.md) for its source and publishing instructions.
+
 Start with [WALKTHROUGH.md](WALKTHROUGH.md). See [COMMANDS.md](COMMANDS.md) for commands and exits, and [FEATURES.md](FEATURES.md) for the supported/unsupported matrix. This remains an unreleased prototype, not a production-readiness claim.
 
 ## Try the foundation

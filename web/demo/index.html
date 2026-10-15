@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForgeSchema interactive demo</title>
+<meta name="description" content="Explore real ForgeSchema schema migrations, SQL plans and verification reports from PostgreSQL 16 and 17.">
+<link rel="stylesheet" href="demo.css">
+<script src="demo.js" defer></script>
+</head>
+<body>
+<main>
+  <header class="intro">
+    <p class="eyebrow">FORGESCHEMA / INTERACTIVE REPLAY</p>
+    <h1>A schema change, made visible.</h1>
+    <p>Follow two customer records through a reviewed migration. Explore the SQL, see what survives, then find the change that verification catches.</p>
+    <p class="disclosure">Recorded CLI results from real PostgreSQL runs. This demo does not connect to a database or execute SQL.</p>
+  </header>
+  <div class="toolbar">
+    <label for="server">Recorded database <select id="server"><option value="17.6">PostgreSQL 17.6</option><option value="16.10">PostgreSQL 16.10</option></select></label>
+    <a href="https://github.com/ForgeSchema/forgeschema/blob/main/WALKTHROUGH.md" target="_blank" rel="noopener">Run it yourself ↗</a>
+  </div>
+  <nav class="steps" aria-label="Walkthrough steps">
+    <button type="button" data-step="schema" aria-pressed="true">1 <span>Compare</span></button>
+    <button type="button" data-step="plan" aria-pressed="false">2 <span>Review SQL</span></button>
+    <button type="button" data-step="apply" aria-pressed="false">3 <span>Check rows</span></button>
+    <button type="button" data-step="verify" aria-pressed="false">4 <span>Find drift</span></button>
+  </nav>
+  <div class="summary" aria-label="Recorded run summary"><span><strong>6</strong> reviewed operations</span><span><strong>2</strong> preserved rows</span><span><strong>1</strong> drift difference</span></div>
+  <section id="view" aria-labelledby="view-title"><p>Loading recorded walkthrough…</p></section>
+  <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+  <footer><p>Unreleased prototype. Supported structural changes only. <a href="https://github.com/ForgeSchema/forgeschema/blob/main/FEATURES.md" target="_blank" rel="noopener">Read the capability matrix ↗</a></p><p id="provenance"></p></footer>
+</main>
+<noscript><p>This interactive replay needs JavaScript. <a href="https://github.com/ForgeSchema/forgeschema/tree/main/examples/walkthrough">Read the same recorded artifacts on GitHub.</a></p></noscript>
+</body>
+</html>
