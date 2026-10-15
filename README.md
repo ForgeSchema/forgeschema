@@ -2,7 +2,7 @@
 
 ForgeSchema is a PostgreSQL schema evolution engine being built in Go. The intended workflow is inspect, plan, apply and verify, with an explained migration artifact between comparison and execution.
 
-Session 3 adds offline comparison and reviewable migration plans to the schema validator and PostgreSQL 16/17 inspector. Plans support explicit column renames and limited additive changes; unsafe proposals are blocked without partial SQL. Live validation of the generated SQL is in progress. Migration execution is not implemented, and this is not a production release.
+Session 3 adds offline comparison and reviewable migration plans to the schema validator and PostgreSQL 16/17 inspector. Plans support explicit column renames and limited additive changes; unsafe proposals are blocked without partial SQL. Live generated-SQL tests passed on PostgreSQL 16.10 and 17.6. Migration execution is not implemented, and this is not a production release.
 
 ## Try the foundation
 
