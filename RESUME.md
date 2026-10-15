@@ -1,8 +1,26 @@
-# ForgeSchema final prototype checkpoint
+# ForgeSchema resume checkpoint
 
-Updated: 2026-10-15, end of day 3 session 6.
+Updated: 2026-10-15, browser-demo follow-up complete.
 
-Status: COMPLETE AND PAUSED. All six authorized sessions are complete. Await the owner's next direction; do not start another milestone, publish a release, create a tag or change licensing automatically.
+Status: COMPLETE AND PAUSED. All six original sessions and the explicitly authorized browser-demo follow-up are complete. Await the owner's next direction; do not start another milestone, publish a release, create a tag or change licensing automatically.
+
+## Browser-demo follow-up
+
+Owner authorization: Build browser demo, 2026-10-15. Completed static interactive replay at https://forgeschema.com/demo/ with full-width view https://forgeschema.com/browser-demo/. This is recorded real CLI evidence, not live SQL execution or a database connection. Four views show before/after schemas, six explained SQL operations, preserved customer rows with stale replay rejection, and selectable match/drift reports. Visitors can select PostgreSQL 16.10 or 17.6 and download original artifacts. No credentials or backend service are introduced.
+
+Engine source/docs/CI commit: 7d0b27c49b227a204bbb3104ea58cf430ed23e74.
+Website content/static assets commit: d0224151a881a3904404af0d9d7dfc284aed4df5.
+CI: https://github.com/ForgeSchema/forgeschema/actions/runs/38704099435 — browser-demo job and both full PostgreSQL jobs passed. The latter include the actual disposable CLI walkthrough. The engine implementation remains 0.0.6-dev with plan format 1.
+
+Source is web/demo/; BROWSER_DEMO.md documents synchronization. python3 scripts/export-browser-demo.py --check validates generated data against both committed recordings. python3 scripts/export-browser-demo.py --site /path/to/forgeschema.com copies four static app files and 32 original artifacts to static/browser-demo/. Source and deployed files must stay synchronized.
+
+Local node --test web/demo/demo.test.cjs passed three DOM-contract tests exercising both recordings, all views, scenario switching/focus announcements, download paths and failure fallback. node --check web/demo/demo.js passed. The checks execute the actual renderer with a DOM harness; they are not a graphical browser test. Browser-control capability was unavailable, so real-browser/graphical QA remains unperformed. No engine Go behavior changed in this follow-up.
+
+Hugo 0.158.0 built 30 pages and 37 static files. Generated internal links/assets resolve. Four copied app files and all 32 copied artifacts match source byte for byte. All 18 theme blobs are unchanged; templates/layout/theme CSS and site structure are preserved. Styling is isolated in the embedded demo document. The contact remains info@forgeschema.com.
+
+The live /demo/ page, full-width HTML, JavaScript, CSS and data JSON were checked over HTTPS. App assets match committed source byte for byte; sampled original downloads from both server versions match. Cloudflare-protected live contact decoded to the correct email. The first /demo/ fetch saw the previous content during deployment; a later check confirmed the new iframe.
+
+This resume update is the final follow-up checkpoint. Stop and await owner direction. Live database editing/execution, expanded migration support and releases are not authorized by this completed task.
 
 ## Published checkpoints
 
@@ -45,7 +63,7 @@ External DDL must be paused. Advisory locks coordinate ForgeSchema clients only;
 
 Verify is READ ONLY/REPEATABLE READ and reads catalog metadata only. It reports supported structural differences without repairs/history writes. A match is a snapshot, not proof of application data, grants/comments, history, commit outcome or future state. The separate harness reads only its own synthetic rows for preservation checks.
 
-Defaults, generated/identity columns, foreign/unique/check constraints, general type/nullability conversion, required additions to existing tables, destructive changes, advanced indexes, backfills, concurrent index builds, other databases, browser UI and MCP remain outside this prototype. Copyright 2026 ForgeSchema; all rights reserved. No binary release, tag or licensing change is authorized.
+Defaults, generated/identity columns, foreign/unique/check constraints, general type/nullability conversion, required additions to existing tables, destructive changes, advanced indexes, backfills, concurrent index builds, other databases, live connected browser UI and MCP remain outside this prototype. Copyright 2026 ForgeSchema; all rights reserved. No binary release, tag or licensing change is authorized.
 
 ## Continuation instructions
 
