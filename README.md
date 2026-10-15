@@ -1,8 +1,10 @@
 # ForgeSchema
 
-ForgeSchema is a PostgreSQL schema evolution engine being built in Go. The intended workflow is inspect, plan, apply and verify, with an explained migration artifact between comparison and execution.
+ForgeSchema is a PostgreSQL schema evolution engine written in Go. The workflow is inspect, plan, apply and verify, with an explained migration artifact between comparison and execution.
 
-Session 5 adds independent read-only verification, deterministic structural drift reports and end-to-end execution/failure tests. The CLI now supports inspect, plan, apply and verify. Verification, the full CLI workflow and failure cases passed on PostgreSQL 16.10 and 17.6. This remains an unreleased development prototype, not a production-readiness claim.
+The six-session prototype is complete. Inspect, plan, apply and independently verify supported PostgreSQL schemas. The reproducible walkthrough runs the compiled CLI against two populated synthetic customers, applies six operations and demonstrates stale-plan rejection and read-only drift detection.
+
+Start with [WALKTHROUGH.md](WALKTHROUGH.md). See [COMMANDS.md](COMMANDS.md) for commands and exits, and [FEATURES.md](FEATURES.md) for the supported/unsupported matrix. This remains an unreleased prototype, not a production-readiness claim.
 
 ## Try the foundation
 
@@ -17,7 +19,7 @@ go build -o bin/forgeschema ./cmd/forgeschema
 ./bin/forgeschema inspect public
 ```
 
-Validation prints canonical JSON on success and errors to stderr on failure. Validation uses exit 0 for success, 1 for invalid input/files, and 2 for usage errors. Blocked plan targets use exit 3; standalone verification uses exit 4 for structural drift. See SCHEMA.md for the exact supported contract. The version is 0.0.5-dev; no release binaries are published.
+Validation prints canonical JSON on success and errors to stderr on failure. Validation uses exit 0 for success, 1 for invalid input/files, and 2 for usage errors. Blocked plan targets use exit 3; standalone verification uses exit 4 for structural drift. See SCHEMA.md for the exact supported contract. The version is 0.0.6-dev; no release binaries are published.
 
 ## Review a migration plan
 
@@ -61,6 +63,6 @@ Without that variable, database tests explicitly skip. The GitHub Actions workfl
 
 ## Development checkpoints
 
-Read PLAN.md for the six-session schedule, RESUME.md for current results and continuation instructions, and AGENTS.md for session rules. Every session ends with code and website updates, followed by a pause for the owner's go-ahead. Website content is maintained in photozeitgeist/forgeschema.com. Domain connection is left to the owner.
+Read PLAN.md for the six-session schedule, RESUME.md for current results and continuation instructions, and AGENTS.md for session rules. Every session ends with code and website updates, followed by a pause for the owner's go-ahead. Website content is maintained in photozeitgeist/forgeschema.com. The owner connected https://forgeschema.com/. All six sessions are complete; further work awaits owner direction.
 
 Copyright 2026 ForgeSchema. All rights reserved. No open-source license has been granted. Third-party dependency notices are in THIRD_PARTY_NOTICES.md.

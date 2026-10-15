@@ -1,0 +1,16 @@
+ForgeSchema plan: ready
+Source: 9b0aa0c866a0698d99f0368cd9d0be5cc312b009c6095ef51d7ad5036f4037c3
+Target: 317731e2d958cd72ce20a8e09f58f329cff2b87b21fb7e7c6fff44d03368da5a
+1. Create a new table with its declared columns and primary key; indexes follow separately.
+CREATE TABLE "fs_demo_a8d2940e38d88212"."events" ("customer_id" bigint NOT NULL, "id" bigint NOT NULL, CONSTRAINT "events_pkey" PRIMARY KEY ("id"));
+2. Explicitly rename customer_name to full_name; PostgreSQL retains column data and updates existing key/index references. Requires a table lock.
+ALTER TABLE "fs_demo_a8d2940e38d88212"."customers" RENAME COLUMN "customer_name" TO "full_name";
+3. Explicitly rename id to customer_id; PostgreSQL retains column data and updates existing key/index references. Requires a table lock.
+ALTER TABLE "fs_demo_a8d2940e38d88212"."customers" RENAME COLUMN "id" TO "customer_id";
+4. Add a nullable column without a default; existing rows receive NULL. Requires a table lock.
+ALTER TABLE "fs_demo_a8d2940e38d88212"."customers" ADD COLUMN "notes" text NULL;
+5. Create an ordinary btree index after table and column changes. This is not concurrent and can block writes.
+CREATE INDEX "customers_notes_idx" ON "fs_demo_a8d2940e38d88212"."customers" ("notes");
+6. Create an ordinary btree index after table and column changes. This is not concurrent and can block writes.
+CREATE INDEX "events_customer_idx" ON "fs_demo_a8d2940e38d88212"."events" ("customer_id");
+Review only: this planning command does not execute SQL.

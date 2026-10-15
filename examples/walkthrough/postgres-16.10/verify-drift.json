@@ -1,0 +1,1 @@
+{"status":"drift","schema":"fs_demo_f88cd598f1dfabe9","expected_fingerprint":"bf6dfbbd08eeb781d2b6ff0803eaa4457eff620b058df35575f7bd809586138a","actual_fingerprint":"0075fa2155aa89474838c4bde0e6614f8a3dd7c69d0a837c5a19a5be0a97a111","differences":[{"kind":"column_unexpected","table":"customers","column":"external_note","expected":"absent","actual":"present"}]}

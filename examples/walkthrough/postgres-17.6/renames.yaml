@@ -1,0 +1,8 @@
+version: 1
+columns:
+- table: customers
+  from: id
+  to: customer_id
+- table: customers
+  from: customer_name
+  to: full_name

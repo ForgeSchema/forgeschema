@@ -1,0 +1,32 @@
+version completed with expected exit 0
+ForgeSchema walkthrough: CLI 0.0.6-dev; PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1); isolated schema fs_demo_f88cd598f1dfabe9
+inspect fs_demo_f88cd598f1dfabe9 completed with expected exit 0 → current.json
+plan demo-output/current.json demo-output/desired.json demo-output/renames.yaml completed with expected exit 0 → reviewed-plan.json
+plan --explain demo-output/current.json demo-output/desired.json demo-output/renames.yaml completed with expected exit 0 → review.txt
+Review printed before disposable execution:
+ForgeSchema plan: ready
+Source: 2fb94c535e8e972de13deef2e7cf7ae0eddf74ffa7164af373e9cf8dc8ebbc49
+Target: bf6dfbbd08eeb781d2b6ff0803eaa4457eff620b058df35575f7bd809586138a
+1. Create a new table with its declared columns and primary key; indexes follow separately.
+CREATE TABLE "fs_demo_f88cd598f1dfabe9"."events" ("customer_id" bigint NOT NULL, "id" bigint NOT NULL, CONSTRAINT "events_pkey" PRIMARY KEY ("id"));
+2. Explicitly rename customer_name to full_name; PostgreSQL retains column data and updates existing key/index references. Requires a table lock.
+ALTER TABLE "fs_demo_f88cd598f1dfabe9"."customers" RENAME COLUMN "customer_name" TO "full_name";
+3. Explicitly rename id to customer_id; PostgreSQL retains column data and updates existing key/index references. Requires a table lock.
+ALTER TABLE "fs_demo_f88cd598f1dfabe9"."customers" RENAME COLUMN "id" TO "customer_id";
+4. Add a nullable column without a default; existing rows receive NULL. Requires a table lock.
+ALTER TABLE "fs_demo_f88cd598f1dfabe9"."customers" ADD COLUMN "notes" text NULL;
+5. Create an ordinary btree index after table and column changes. This is not concurrent and can block writes.
+CREATE INDEX "customers_notes_idx" ON "fs_demo_f88cd598f1dfabe9"."customers" ("notes");
+6. Create an ordinary btree index after table and column changes. This is not concurrent and can block writes.
+CREATE INDEX "events_customer_idx" ON "fs_demo_f88cd598f1dfabe9"."events" ("customer_id");
+Review only: this planning command does not execute SQL.
+
+apply demo-output/reviewed-plan.json completed with expected exit 0 → apply-result.json
+verify --plan demo-output/reviewed-plan.json completed with expected exit 0 → verify-match.json
+apply demo-output/reviewed-plan.json completed with expected exit 1 → replay-error.txt
+inspect fs_demo_f88cd598f1dfabe9 completed with expected exit 0 → before-drift-check.json
+verify --plan demo-output/reviewed-plan.json completed with expected exit 4 → verify-drift.json
+inspect fs_demo_f88cd598f1dfabe9 completed with expected exit 0 → after-drift-check.json
+verify demo-output/desired.json completed with expected exit 0 → verify-final.json
+PASS: six operations, two original rows preserved, stale replay rejected, drift detected without repair, target restored.
+Dropped only isolated demo schema fs_demo_f88cd598f1dfabe9; migration history is retained.

@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "schema": "fs_demo_f88cd598f1dfabe9",
+  "postgresql_version": "16.10 (Debian 16.10-1.pgdg13+1)",
+  "cli_version": "0.0.6-dev",
+  "operations": 6,
+  "rows_preserved": 2,
+  "plan_id": "e8ce0d27fc79c569c1fe40c0f4e2c4ce17a494362d85bc4aa377ab12db980204",
+  "migration_id": "b1bdf301aa39b85e93520332dd78ba9d",
+  "drift_exit": 4,
+  "replay_exit": 1,
+  "cleanup": "dropped"
+}
