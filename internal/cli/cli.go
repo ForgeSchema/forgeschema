@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,18 +15,20 @@ import (
 	"github.com/ForgeSchema/forgeschema/schema"
 )
 
-const Version = "0.0.3-dev"
+const Version = "0.0.4-dev"
 const usage = `ForgeSchema — PostgreSQL schema evolution prototype
 Usage:
   forgeschema version
   forgeschema validate SCHEMA.yaml
   forgeschema inspect SCHEMA_NAME
   forgeschema plan [--explain] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]
+  forgeschema apply PLAN.json
   forgeschema help
 
 Inspection uses DATABASE_URL and reads catalog metadata only, with a 30-second
 timeout. PostgreSQL 16 and 17 are supported. Planning is offline and does not
-execute SQL. A blocked plan exits 3. Apply and verify are pending.
+execute SQL. A blocked plan exits 3. Apply executes an exact reviewed artifact;
+pause external DDL first. Standalone verify is pending.
 `
 
 func Run(args []string, out, errs io.Writer) int {
@@ -45,6 +48,53 @@ func Run(args []string, out, errs io.Writer) int {
 			return fail(errs, "version takes no arguments", 2)
 		}
 		fmt.Fprintln(out, Version)
+		return 0
+	case "apply":
+		if len(args) != 2 {
+			return fail(errs, "usage: forgeschema apply PLAN.json (set DATABASE_URL; pause external DDL)", 2)
+		}
+		f, err := os.Open(args[1])
+		if err != nil {
+			return fail(errs, err.Error(), 1)
+		}
+		p, err := plan.Load(f)
+		f.Close()
+		if err != nil {
+			return fail(errs, err.Error(), 1)
+		}
+		if p.Status != "ready" {
+			return fail(errs, "blocked plans cannot be applied", 3)
+		}
+		dsn := os.Getenv("DATABASE_URL")
+		if dsn == "" {
+			return fail(errs, "DATABASE_URL is required for apply", 2)
+		}
+		db, err := sql.Open("postgres", dsn)
+		if err != nil {
+			return fail(errs, "invalid database connection configuration", 1)
+		}
+		defer db.Close()
+		result, err := postgres.Apply(context.Background(), db, p, postgres.ApplyOptions{})
+		if err != nil {
+			var commit *postgres.CommitError
+			if errors.As(err, &commit) {
+				return fail(errs, commit.Error()+"; plan_id="+commit.PlanID+" migration_id="+commit.MigrationID, 1)
+			}
+			var drift *postgres.DriftError
+			if errors.As(err, &drift) {
+				return fail(errs, drift.Error(), 1)
+			}
+			var stage *postgres.ApplyError
+			if errors.As(err, &stage) {
+				return fail(errs, "migration failed during "+stage.Stage+"; transaction was not committed", 1)
+			}
+			return fail(errs, "could not apply reviewed migration plan", 1)
+		}
+		b, err := json.Marshal(result)
+		if err != nil {
+			return fail(errs, "could not encode apply result", 1)
+		}
+		fmt.Fprintln(out, string(b))
 		return 0
 	case "plan":
 		inputs := args[1:]

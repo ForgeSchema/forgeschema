@@ -34,10 +34,25 @@ func Inspect(ctx context.Context, db *sql.DB, name string) (schema.Document, err
 		return empty, err
 	}
 	defer tx.Rollback()
-	// Qualify every object and prevent user objects shadowing catalog functions.
-	if _, err = tx.ExecContext(ctx, "SET LOCAL search_path = pg_catalog"); err != nil {
+	doc, err := inspectTx(ctx, tx, name)
+	if err != nil {
 		return empty, err
 	}
+	if err = tx.Commit(); err != nil {
+		return empty, err
+	}
+	return doc, nil
+}
+
+// inspectTx uses the caller's transaction snapshot. Apply uses READ COMMITTED
+// and calls this only after acquiring relation locks, then again after DDL.
+func inspectTx(ctx context.Context, tx *sql.Tx, name string) (schema.Document, error) {
+	empty := schema.Document{}
+	// Qualify every object and prevent user objects shadowing catalog functions.
+	if _, err := tx.ExecContext(ctx, "SET LOCAL search_path = pg_catalog"); err != nil {
+		return empty, err
+	}
+	var err error
 	var version int
 	if err = tx.QueryRowContext(ctx, "SELECT current_setting('server_version_num')::integer").Scan(&version); err != nil {
 		return empty, err
@@ -62,9 +77,6 @@ func Inspect(ctx context.Context, db *sql.DB, name string) (schema.Document, err
 	normalized, err := schema.Normalize(doc)
 	if err != nil {
 		return empty, unsupported("schema "+name, err.Error())
-	}
-	if err = tx.Commit(); err != nil {
-		return empty, err
 	}
 	return normalized, nil
 }

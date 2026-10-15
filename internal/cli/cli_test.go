@@ -81,3 +81,21 @@ func TestPlanCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyInputErrors(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	for _, c := range []struct {
+		args []string
+		want int
+	}{{[]string{"apply"}, 2}, {[]string{"apply", "missing.json"}, 1}, {[]string{"apply", "../../examples/customer-plan.json"}, 2}} {
+		var out, errs bytes.Buffer
+		if got := Run(c.args, &out, &errs); got != c.want || out.Len() != 0 {
+			t.Fatalf("%v: %d %s", c.args, got, errs.String())
+		}
+	}
+	t.Setenv("DATABASE_URL", "postgres://user:secret-that-must-not-appear@localhost:invalid/db")
+	var out, errs bytes.Buffer
+	if got := Run([]string{"apply", "../../examples/customer-plan.json"}, &out, &errs); got != 1 || strings.Contains(errs.String(), "secret-that-must-not-appear") || out.Len() != 0 {
+		t.Fatalf("unsafe diagnostic %d %s", got, errs.String())
+	}
+}

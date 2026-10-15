@@ -7,4 +7,4 @@ ALTER TABLE "public"."customers" RENAME COLUMN "customer_name" TO "full_name";
 ALTER TABLE "public"."customers" ADD COLUMN "notes" text NULL;
 3. Create an ordinary btree index after table and column changes. This is not concurrent and can block writes.
 CREATE INDEX "customers_notes_idx" ON "public"."customers" ("notes");
-Review only: ForgeSchema does not execute plans in this checkpoint.
+Review only: this planning command does not execute SQL.

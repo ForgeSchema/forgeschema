@@ -310,6 +310,6 @@ func (p Plan) Summary() (string, error) {
 	for i, op := range p.Operations {
 		fmt.Fprintf(&b, "%d. %s\n%s\n", i+1, op.Explanation, op.SQL)
 	}
-	fmt.Fprintln(&b, "Review only: ForgeSchema does not execute plans in this checkpoint.")
+	fmt.Fprintln(&b, "Review only: this planning command does not execute SQL.")
 	return b.String(), nil
 }
