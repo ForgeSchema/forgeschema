@@ -1,8 +1,26 @@
 # ForgeSchema resume checkpoint
 
-Updated: 2026-10-15, Apache 2.0 license adoption complete.
+Updated: 2026-10-15, first alpha release and binaries.
 
-Status: COMPLETE AND PAUSED. All six original sessions, the browser-demo follow-up and Apache 2.0 adoption are complete. Await the owner's next direction; do not start another milestone, publish a release, create a tag or change the selected Apache 2.0 licensing automatically.
+Status: COMPLETE AND PAUSED. All six original sessions, the browser demo, Apache 2.0 adoption and the first alpha release are complete. Await the owner's next direction; do not start another milestone, publish another release, create another tag or change the selected Apache 2.0 licensing automatically.
+
+## First public alpha release and binaries
+
+Owner explicitly requested the coding-repository release and binaries on 2026-10-15 and instructed autonomous completion without another confirmation. This supersedes earlier no-release limits for the first alpha. Published https://github.com/ForgeSchema/forgeschema/releases/tag/v0.1.0-alpha.1 as a public alpha prerelease (not draft).
+
+Tag v0.1.0-alpha.1 points to tested source acbf028db19658ae117cd80cc35c5d76b39ecb94. VERSION and the CLI report 0.1.0-alpha.1; plan format remains 1. The release has six archives: linux/darwin/windows × amd64/arm64, with tar.gz for Linux/macOS and zip for Windows, plus SHA256SUMS. Archives include the CLI, LICENSE, NOTICE, dependency notices and key guides. GitHub also provides source archives.
+
+Release workflow https://github.com/ForgeSchema/forgeschema/actions/runs/38709629322 passed all validation, packaging and publication jobs. It reuses Test for race/vet, both PostgreSQL 16.10/17.6 suites and real CLI walkthroughs, and browser replay checks. Independent Test run https://github.com/ForgeSchema/forgeschema/actions/runs/38709629336 also passed. Publication used the job-scoped GitHub token, uploaded all seven assets to a draft at the exact tested commit, then published.
+
+Downloaded all six public binary archives and SHA256SUMS after publication. Every digest matched; every archive includes the exact Apache license and required notices. Downloaded Linux amd64 passed version, example schema validation and byte-identical example-plan generation. Linux binaries have ELF headers and Windows binaries PE/MZ headers. Other targets are cross-compiled and have not been native-runtime tested; macOS/Windows are unsigned and not notarized. This remains an alpha prototype, not a production-readiness claim.
+
+Evidence/docs commit: ec2d4627d4a8a231ce834409aecc217a1042d2ff. Selected build logs and public verification results: test/results/release-v0.1.0-alpha.1.txt. The exact public checksum manifest is committed beside it. This resume is a separate final checkpoint.
+
+Website release/download commit: 7178233d19a42d37f72b3eb19f22cc40952d4601. Live https://forgeschema.com/download/ includes all six version-specific binary links and SHA256SUMS. Homepage badge, existing menu copy and current content reflect the alpha; the browser demo explicitly retains its earlier recorded artifacts. Hugo 0.158.0 built 31 pages/39 static files; internal links/assets resolved. All 18 theme blobs are unchanged. Contact remains info@forgeschema.com; no DNS or theme changes were made.
+
+RELEASING.md and scripts/release.sh describe the process. The Release workflow runs on intentional main-branch changes to VERSION/release workflow/build script or manual dispatch; ordinary docs/code commits do not publish again. It refuses to overwrite existing releases. For future authorized releases, update VERSION and the CLI constant together, refresh RELEASE_NOTES.md, validate, publish, verify public assets and update website/resume. If a run fails after draft creation, inspect the draft/assets before resuming. Do not change the existing published tag or replace assets silently.
+
+Stop after this completed handoff and await the owner's next direction. Apache 2.0 remains selected; external DDL must still be paused for apply, and all operational limits below remain applicable.
 
 ## Apache License 2.0 adoption
 
@@ -32,7 +50,7 @@ Hugo 0.158.0 built 30 pages and 37 static files. Generated internal links/assets
 
 The live /demo/ page, full-width HTML, JavaScript, CSS and data JSON were checked over HTTPS. App assets match committed source byte for byte; sampled original downloads from both server versions match. Cloudflare-protected live contact decoded to the correct email. The first /demo/ fetch saw the previous content during deployment; a later check confirmed the new iframe.
 
-This resume update is the final follow-up checkpoint. Stop and await owner direction. Live database editing/execution, expanded migration support and releases are not authorized by this completed task.
+This resume update is the final follow-up checkpoint. Stop and await owner direction. This historical browser-demo task did not authorize live database editing/execution or expanded migration support. The later explicit release authorization is recorded above.
 
 ## Published checkpoints
 
@@ -67,7 +85,7 @@ Hugo 0.158.0 built 29 pages. All generated internal links/assets resolve; no inh
 
 ## Implemented contract and operational limits
 
-CLI 0.0.6-dev, plan format 1. Commands: validate, inspect, plan, apply, verify, version/help. One named schema; strict supported ordinary tables/columns, basic/composite primary keys and ordinary btree indexes. Explicit column renames, new tables/keys/indexes, nullable additions and ordinary index additions are executable. Unsupported changes block the whole plan with no operations. Saved artifacts are rebuilt and validated before execution.
+CLI 0.1.0-alpha.1, plan format 1. Commands: validate, inspect, plan, apply, verify, version/help. One named schema; strict supported ordinary tables/columns, basic/composite primary keys and ordinary btree indexes. Explicit column renames, new tables/keys/indexes, nullable additions and ordinary index additions are executable. Unsupported changes block the whole plan with no operations. Saved artifacts are rebuilt and validated before execution.
 
 Apply freezes the validated artifact, takes a transaction advisory lock and ACCESS EXCLUSIVE source-table locks, inspects the source after locks under READ COMMITTED, checks fingerprints, validates isolated metadata, executes supported DDL, verifies target and records history atomically. Defaults: lock 5s, statement 30s, overall 60s. A commit error may leave outcome uncertain and reports IDs for investigation.
 
@@ -75,7 +93,7 @@ External DDL must be paused. Advisory locks coordinate ForgeSchema clients only;
 
 Verify is READ ONLY/REPEATABLE READ and reads catalog metadata only. It reports supported structural differences without repairs/history writes. A match is a snapshot, not proof of application data, grants/comments, history, commit outcome or future state. The separate harness reads only its own synthetic rows for preservation checks.
 
-Defaults, generated/identity columns, foreign/unique/check constraints, general type/nullability conversion, required additions to existing tables, destructive changes, advanced indexes, backfills, concurrent index builds, other databases, live connected browser UI and MCP remain outside this prototype. Copyright 2026 ForgeSchema. The owner selected Apache License 2.0 for both repositories on 2026-10-15; see LICENSE, NOTICE and third-party notices. No binary release or tag is authorized.
+Defaults, generated/identity columns, foreign/unique/check constraints, general type/nullability conversion, required additions to existing tables, destructive changes, advanced indexes, backfills, concurrent index builds, other databases, live connected browser UI and MCP remain outside this prototype. Copyright 2026 ForgeSchema. The owner selected Apache License 2.0 for both repositories on 2026-10-15; see LICENSE, NOTICE and third-party notices. The owner subsequently authorized the first alpha release and its tag; see the release checkpoint above.
 
 ## Continuation instructions
 
