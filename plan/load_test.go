@@ -3,6 +3,7 @@ package plan
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 )
@@ -82,6 +83,11 @@ func TestBlockedPlanLoadsButHasNoOperations(t *testing.T) {
 }
 func FuzzPlanLoader(f *testing.F) {
 	f.Add(`{}`)
+	if b, err := os.ReadFile("../examples/customer-plan.json"); err == nil {
+		f.Add(string(b))
+	} else {
+		f.Fatal(err)
+	}
 	f.Add(`{"format_version":1}`)
 	f.Fuzz(func(t *testing.T, input string) {
 		p, err := Load(strings.NewReader(input))

@@ -61,6 +61,16 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 	if err := p.Validate(); err != nil {
 		return empty, err
 	}
+	// Freeze a privately owned validated artifact before waiting on database
+	// locks; caller-owned slices must not remain an execution input.
+	frozenJSON, err := json.Marshal(p)
+	if err != nil {
+		return empty, err
+	}
+	p, err = plan.Load(bytes.NewReader(frozenJSON))
+	if err != nil {
+		return empty, err
+	}
 	if p.Status != "ready" {
 		return empty, fmt.Errorf("blocked plans cannot be applied")
 	}

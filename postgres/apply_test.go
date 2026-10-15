@@ -341,3 +341,36 @@ func TestApplyInvalidOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyFreezesCallerArtifactBeforeLockWait(t *testing.T) {
+	db := database(t)
+	name, p := applyFixture(t, db)
+	external, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer external.Rollback()
+	if _, err = external.Exec("LOCK TABLE " + name + ".customers IN ACCESS EXCLUSIVE MODE"); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := postgres.Apply(context.Background(), db, p, postgres.ApplyOptions{}); done <- err }()
+	waitForRelationLock(t, db)
+	// The API has accepted and frozen the original artifact. A later mutation of
+	// this caller-owned slice must not change what the transaction executes.
+	p.Operations[0].SQL = "SELECT 1;"
+	if err = external.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err = <-done; err != nil {
+		t.Fatal("caller mutation affected the frozen plan:", err)
+	}
+	actual, err := postgres.Inspect(context.Background(), db, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fp, _ := actual.Fingerprint()
+	if fp != p.TargetFingerprint {
+		t.Fatal("frozen target not reached")
+	}
+}
