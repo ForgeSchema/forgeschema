@@ -6,7 +6,7 @@ The six-session prototype is complete. Inspect, plan, apply and independently ve
 
 Explore the [interactive browser demo](https://forgeschema.com/demo/) to compare recorded schemas, review SQL, inspect preserved rows and switch between match/drift reports. It replays actual CLI evidence; it does not execute database changes. See [BROWSER_DEMO.md](BROWSER_DEMO.md) for its source and publishing instructions.
 
-Start with [WALKTHROUGH.md](WALKTHROUGH.md). See [COMMANDS.md](COMMANDS.md) for commands and exits, and [FEATURES.md](FEATURES.md) for the supported/unsupported matrix. This remains an unreleased prototype, not a production-readiness claim.
+Start with [WALKTHROUGH.md](WALKTHROUGH.md). See [COMMANDS.md](COMMANDS.md) for commands and exits, and [FEATURES.md](FEATURES.md) for the supported/unsupported matrix. This is an alpha prototype, not a production-readiness claim.
 
 ## Try the foundation
 
@@ -21,7 +21,7 @@ go build -o bin/forgeschema ./cmd/forgeschema
 ./bin/forgeschema inspect public
 ```
 
-Validation prints canonical JSON on success and errors to stderr on failure. Validation uses exit 0 for success, 1 for invalid input/files, and 2 for usage errors. Blocked plan targets use exit 3; standalone verification uses exit 4 for structural drift. See SCHEMA.md for the exact supported contract. The version is 0.0.6-dev; no release binaries are published.
+Validation prints canonical JSON on success and errors to stderr on failure. Validation uses exit 0 for success, 1 for invalid input/files, and 2 for usage errors. Blocked plan targets use exit 3; standalone verification uses exit 4 for structural drift. See SCHEMA.md for the exact supported contract. The version is 0.1.0-alpha.1. Download packaged binaries and SHA256SUMS from the [alpha release](https://github.com/ForgeSchema/forgeschema/releases/tag/v0.1.0-alpha.1). Linux, macOS and Windows archives cover amd64 and arm64; see [RELEASING.md](RELEASING.md) for validation and platform limits.
 
 ## Review a migration plan
 

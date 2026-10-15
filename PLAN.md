@@ -45,3 +45,7 @@ On 2026-10-15 the owner explicitly requested a browser demo after the completed 
 ## Authorized license adoption
 
 On 2026-10-15 the owner selected Apache License 2.0 for the code and website repositories. Add canonical LICENSE and attribution notices, replace proprietary statements and reflect the license on the live site. Preserve third-party licenses and the website theme. No binary release or tag is implied.
+
+## Authorized first release
+
+On 2026-10-15 the owner explicitly requested a GitHub release and downloadable binaries. Prepare v0.1.0-alpha.1 as an alpha prerelease, gate publication on full CI, package six platforms with checksums/licenses, verify public artifacts, update the website and resume, then pause. This supersedes prior no-release limits for this release.

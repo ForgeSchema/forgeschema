@@ -1,0 +1,62 @@
+name: Release
+on:
+  push:
+    branches: [main]
+    paths:
+      - VERSION
+      - .github/workflows/release.yml
+      - scripts/release.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  validate:
+    uses: ./.github/workflows/test.yml
+  build:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: bash scripts/release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-binaries
+          path: dist/*
+          if-no-files-found: error
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-binaries
+          path: dist
+      - name: Publish verified alpha release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(cat VERSION)
+          tag="v$version"
+          (cd dist && sha256sum --check SHA256SUMS)
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 7
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refusing to overwrite it" >&2
+            exit 1
+          fi
+          gh release create "$tag" dist/* --target "$GITHUB_SHA" --title "ForgeSchema $tag" --notes-file RELEASE_NOTES.md --prerelease --draft
+          gh release view "$tag" --json assets --jq '.assets | length' | grep -x 7
+          gh release edit "$tag" --draft=false --prerelease
+          gh release view "$tag" --json url,isDraft,isPrerelease,assets
