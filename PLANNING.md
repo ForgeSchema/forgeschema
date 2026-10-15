@@ -23,7 +23,7 @@ The JSON object has format_version (1), canonical source and target schema objec
 
 The status is ready when the supported structural comparison contains no blockers. This means ready for review, not approved or guaranteed executable against a live database. A blocked plan contains ordered reasons and an EMPTY operations list, including no SQL for changes that would otherwise be supported. There is no partial-apply interpretation. Equivalent schemas yield ready with no operations.
 
-The Go API is plan.Build(source, target, renames). Plan.Validate reconstructs the entire canonical artifact from its embedded schemas and rename mappings and rejects changes to operations, SQL, explanations, status, format or fingerprints. Plan.JSON and Plan.Summary perform that consistency check before output. The check is not a signature, authorization or evidence that a database still matches. There is no external plan-file loader or executor yet; strict parsing and execution preconditions belong to session 4.
+The Go API is plan.Build(source, target, renames). Plan.Validate reconstructs the entire canonical artifact from its embedded schemas and rename mappings and rejects changes to operations, SQL, explanations, status, format or fingerprints. Plan.JSON and Plan.Summary perform that consistency check before output. The check is not a signature, authorization or evidence that a database still matches. The plan.Load JSON loader and postgres.Apply executor are now available; read APPLY.md for strict artifact acceptance, drift checks, transaction behavior and operational limits.
 
 ## Supported operation order
 
@@ -35,6 +35,6 @@ Dropping or implicitly renaming tables/columns, changing types/nullability, addi
 
 ## Validation boundary
 
-Unit tests cover no-op equivalence, normalized aliases and ordering, quoted identifiers, rename identity propagation, blocked mixed proposals, malformed mappings, artifact round trips and tampered plans. The live PostgreSQL test harness executes generated SQL for combined table creation, primary-key/index column renames, nullable additions and index creation, then reinspects and checks original data. This test-only execution code does not introduce an apply command.
+Unit tests cover no-op equivalence, normalized aliases and ordering, quoted identifiers, rename identity propagation, blocked mixed proposals, malformed mappings, artifact round trips and tampered plans. The live PostgreSQL test harness executes generated SQL for combined table creation, primary-key/index column renames, nullable additions and index creation, then reinspects and checks original data. The planner remains offline; the separate apply command handles reviewed-artifact execution.
 
-The plan describes supported structural changes. It does not inspect external dependencies, permissions, dropped-column physical limits, disk capacity, lock contention or a changed database. Those may still cause execution failure. Drift checks, coordination locks, transaction handling and migration history are the next checkpoint, not guarantees of this planner.
+The plan describes supported structural changes. It does not inspect external dependencies, permissions, dropped-column physical limits, disk capacity, lock contention or a changed database. Those may still cause execution failure. The separate executor supplies drift checks, coordination locks, transaction handling and migration history. They are not guarantees made by offline planning.

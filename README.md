@@ -2,7 +2,7 @@
 
 ForgeSchema is a PostgreSQL schema evolution engine being built in Go. The intended workflow is inspect, plan, apply and verify, with an explained migration artifact between comparison and execution.
 
-Session 3 adds offline comparison and reviewable migration plans to the schema validator and PostgreSQL 16/17 inspector. Plans support explicit column renames and limited additive changes; unsafe proposals are blocked without partial SQL. Live generated-SQL tests passed on PostgreSQL 16.10 and 17.6. Migration execution is not implemented, and this is not a production release.
+Session 4 adds strict plan loading and transactional execution to schema validation, inspection and deterministic planning. Apply checks live source drift after locks, verifies the target and commits isolated migration history atomically. Live execution and artifact-freezing checks passed on PostgreSQL 16.10 and 17.6. Standalone verification is not implemented, and this is not a production release.
 
 ## Try the foundation
 
@@ -17,7 +17,7 @@ go build -o bin/forgeschema ./cmd/forgeschema
 ./bin/forgeschema inspect public
 ```
 
-Validation prints canonical JSON on success and errors to stderr on failure. Exit codes are 0 for success, 1 for invalid input or file errors, and 2 for command usage errors. See SCHEMA.md for the exact supported contract. The version is 0.0.3-dev; no release binaries are published.
+Validation prints canonical JSON on success and errors to stderr on failure. Exit codes are 0 for success, 1 for invalid input or file errors, and 2 for command usage errors. See SCHEMA.md for the exact supported contract. The version is 0.0.4-dev; no release binaries are published.
 
 ## Review a migration plan
 
@@ -26,7 +26,7 @@ Validation prints canonical JSON on success and errors to stderr on failure. Exi
 ./bin/forgeschema plan --explain examples/customers.yaml examples/customers-next.yaml examples/customer-renames.yaml
 ```
 
-The default output is a versioned JSON artifact; --explain prints a human review. Inspection JSON can also be used as the source schema. A blocked plan exits 3, includes reasons and contains no operations. These commands never execute SQL. See PLANNING.md for the artifact format, supported operations and limits.
+The default output is a versioned JSON artifact; --explain prints a human review. Inspection JSON can also be used as the source schema. A blocked plan exits 3, includes reasons and contains no operations. The plan commands never execute SQL. To execute a saved reviewed artifact, use `forgeschema apply PLAN.json` with DATABASE_URL set and external DDL paused. Read APPLY.md for transaction, locking, role and commit-outcome limits. See PLANNING.md for the artifact format, supported operations and limits.
 
 ## PostgreSQL fixture
 
