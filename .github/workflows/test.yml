@@ -35,3 +35,14 @@ jobs:
       - run: go vet ./...
       - run: go build -o bin/forgeschema ./cmd/forgeschema
       - run: ./bin/forgeschema validate examples/customers.yaml
+      - name: Run fresh-checkout walkthrough
+        env:
+          FORGESCHEMA_DEMO_DATABASE_URL: ${{ env.FORGESCHEMA_TEST_DATABASE_URL }}
+        run: sh scripts/demo.sh --output demo-output --emit-bundle
+      - name: Save walkthrough artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: walkthrough-postgres-${{ matrix.postgres }}
+          path: demo-output/
+          if-no-files-found: ignore
