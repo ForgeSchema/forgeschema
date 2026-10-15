@@ -1,45 +1,52 @@
 # ForgeSchema resume checkpoint
 
-Updated: 2026-10-15, end of day 2 session 3.
+Updated: 2026-10-15, end of day 2 session 4.
 
-Status: PAUSED. Sessions 1–3 are complete. Await an explicit go-ahead for session 4 only. Do not begin execution work during this checkpoint.
+Status: PAUSED. Sessions 1–4 are complete. Await explicit go-ahead for session 5 only. Do not start standalone verification or further hardening during this checkpoint.
 
 ## Published checkpoints
-Engine session 3 implementation/evidence: 117c49d10f4119f5e0fbb9489d6fb4e8e6e15fce.
-Initial live-tested planner commit: 32a79169e88ef5ed95090e2dff9dc10e64c3b5a9.
-Website session 3 content: 9640ecb00a5f4b41fbb430b137aff9e7685430ac.
-This resume update is a separate documentation commit following implementation.
+Engine implementation/evidence: df6c1e1a5ffea1e519fc511cb15b1e219c237d3a.
+Final functional implementation (artifact freezing): 4304185920af976a1caf653730b02ee62b03d942.
+Website session 4 content: fc2d35b7e093b6d1cf094eb272fc1388bc488674.
+Contact email was added separately in website commit a7fd39fcb372fb6fa71803d1ba8009f4ce211d1f.
+This resume update and package documentation correction are a separate checkpoint commit.
 
 ## Current functionality
-CLI 0.0.3-dev, Go 1.24 minimum. Commands: validate, inspect, plan, version and help. Inspect remains READ ONLY, REPEATABLE READ on PostgreSQL 16/17, reading metadata only.
-New public plan package builds deterministic version 1 JSON artifacts containing canonical source/target schemas, fingerprints, sorted explicit rename mappings, status, explained operations/SQL and blocked reasons. Plan.Validate reconstructs the entire canonical artifact and rejects altered SQL, kind, explanation, status, format or fingerprints. This is consistency checking, not signing or live drift verification.
-Supported operations: create tables with supported columns and basic primary keys, explicitly rename columns, add nullable columns without defaults, add ordinary indexes. Phases: create tables, rename columns, add columns, create indexes. Names are quoted and SQL types come from the normalized whitelist. Renamed column identities propagate into existing key/index references.
-A blocked proposal has an EMPTY operation list: no partial SQL. Drops, implicit renames, conversions, nullability changes, required additions to existing tables, primary-key changes and index drops/rebuilds/renames are blocked. Invalid rename intent is an input error.
-Rename mappings are in a separate strict YAML file: version: 1 and columns: [{table, from, to}]. Source/target names must exist as specified; occupied destinations, source-name reuse, duplicate mappings, chains and swaps are rejected. Schema files retain their original contract.
-CLI: forgeschema plan [--explain] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]. Inspection JSON is accepted as a source schema through the YAML subset. Default output is a JSON artifact; --explain is a readable review. Exit codes 0 ready/no-op, 1 invalid input, 2 usage, 3 blocked (with full artifact on stdout).
-The existing strict YAML decoding logic was extracted into internal/strictyaml for shared schema/rename loading; all schema regression tests pass. Read PLANNING.md, SCHEMA.md and INSPECTION.md.
-Examples: customers-next.yaml, customer-renames.yaml, actual generated customer-plan.json and customer-plan.txt. scripts/check.sh exercises the planner. No product executor, apply command, external plan loader or standalone verify yet. Code remains all rights reserved.
+CLI 0.0.4-dev, Go 1.24 minimum. Commands: validate, inspect, plan, apply, version and help. No independent verify command yet; apply verifies its own target.
+Existing format version 1 plans remain compatible. Canonical operation generation and artifact fields were NOT changed. Planning stays offline; its summary text now accurately says that planning itself does not execute SQL.
+plan.Load strictly reads at most 8 MiB of one UTF-8 JSON object, using exact field names and requiring nonoptional fields. Duplicate/unknown keys, nulls, wrong scalar types, noninteger versions, trailing documents and inconsistent/tampered artifacts are rejected. Whitespace/key order do not matter. Plan.ID hashes the validated compact artifact, not the input file formatting.
+postgres.Apply(ctx, db, plan, ApplyOptions) validates and freezes a private artifact copy before touching the database or waiting on locks. Blocked plans are rejected. It never replans and does not accept arbitrary SQL extensions.
+Apply opens READ COMMITTED, sets local catalog search_path, application_name and timeouts, takes a fixed database-wide transaction advisory lock, and locks every source table in normalized order using ACCESS EXCLUSIVE. It inspects the live source AFTER acquiring locks, so schema changes committed during a lock wait are visible. A source fingerprint mismatch aborts.
+It validates isolated history storage, executes supported frozen operations, reinspects and verifies the target, records history and commits. Application DDL, metadata creation and the history insert share one transaction. No-op plans verify source and return no_changes with no history write.
+History lives in reserved forgeschema_meta.migrations, outside every allowed managed schema. Schema/table ownership and ACLs must belong exclusively to the applying role; table shape, scope, constraints/indexes, defaults and unsupported features are checked. The history table is locked while being validated/used. No silent managed-table exclusions were added to inspection.
+History records random migration ID, canonical plan ID, source/target fingerprints, managed schema, operation count, database timestamp and full artifact JSONB. Replaying an already applied non-no-op normally fails source drift; it is not silently treated as success.
+Apply defaults: lock timeout 5s, statement timeout 30s, overall deadline 60s or the caller's earlier deadline. API supports positive lock/statement overrides of at least 1ms. CLI uses defaults and DATABASE_URL.
+CLI apply result is JSON only after confirmed commit. Input/SQL/drift/verification failures exit 1, usage/missing configuration 2, blocked artifacts 3. Connection errors are sanitized. CommitError reports uncertainty and plan/migration IDs rather than claiming rollback; inspect schema/history before retrying.
 
-## Evidence
-Live PostgreSQL 16.10 and 17.6 suites passed:
-https://github.com/ForgeSchema/forgeschema/actions/runs/38695802665
-The new test harness executed six generated operations combining a new table with a primary key/index, two column renames (including a primary-key column and an existing composite-index reference), a nullable addition and index creation. Reinspection exactly matched the target, and both original customer rows retained their IDs/names with NULL in the added column. Execution exists only in the test harness.
-Unit tests cover no-op normalization, deterministic output, quoting, identity propagation, blocked mixed proposals with no SQL, invalid rename intent, JSON round trips, tampering and CLI success/blocked/error behavior. All earlier PostgreSQL inspector tests also passed.
-Selected verbatim logs: test/results/session-3-postgres-16.10.txt and session-3-postgres-17.6.txt. Final local race tests, vet, build, CLI examples and a 16,104-execution schema-reader fuzz run passed. The committed example artifact matches regenerated output byte-for-byte. Local transcript: test/results/session-3-local.txt. Database cases skip locally because this container cannot run PostgreSQL normally; real database evidence is hosted CI.
-Final implementation CI also passed on both PostgreSQL versions: https://github.com/ForgeSchema/forgeschema/actions/runs/38696157729 (commit 117c49d10f4119f5e0fbb9489d6fb4e8e6e15fce).
-Website: Hugo 0.158.0 build passed (26 generated pages), internal links and assets resolved, all 18 theme blobs unchanged. Content/status/roadmap/build/schema/workflow pages and a session 3 development note reflect planning, not execution.
+## Proven results
+Both PostgreSQL 16.10 and 17.6 passed the final functional suite:
+https://github.com/ForgeSchema/forgeschema/actions/runs/38698348149
+Tests cover successful apply and exact history, stale replay rejection, no-ops, malformed/tampered/blocked plans, competing applies (one succeeds, the second sees source drift), fresh source checks after lock waits, lock timeouts/release, real SQL-error rollback, target-mismatch rollback, CLI apply, modified history rejection, invalid options and a caller mutation that cannot affect the already frozen artifact while Apply waits.
+All earlier schema, planner, generated-SQL and inspection tests also passed. Selected verbatim logs: test/results/session-4-postgres-16.10.txt and session-4-postgres-17.6.txt.
+Final implementation/evidence commit CI also passed on both versions:
+https://github.com/ForgeSchema/forgeschema/actions/runs/38698747629
+Local scripts/check.sh passed (race, vet, build and examples), and a short new JSON loader fuzz smoke run passed after 146 executions using a valid artifact seed. The stage 3 JSON example remains byte-identical to regeneration. Transcript: test/results/session-4-local.txt. Database tests skip locally; real PostgreSQL evidence is hosted CI.
+Hugo 0.158.0 built the website (27 generated pages), internal links/assets resolved, all 18 theme blobs remained unchanged. Site content/status/roadmap/build/schema/workflow and session 4 note now reflect apply, with operational limits.
 
-## Domain
-The owner connected ForgeSchema.com during this session. HTTPS https://forgeschema.com/ returned 200 and served ForgeSchema content from this environment. After the website update, the live homepage also served the new 'Reviewable migration plans' badge, confirming the session 3 content is deployed here.
-Do not change DNS/domain configuration. Propagation can still differ by resolver.
+## Website/contact
+The owner connected ForgeSchema.com. HTTPS serves the project; the live homepage now shows Transactional migration execution. The contact page contains info@forgeschema.com and a mail link. Cloudflare email protection rewrites it in delivered HTML; decoding data-cfemail confirmed the requested address. Do not alter the template or DNS/domain configuration.
 
-## Environment and publishing
-Local tools currently /tmp/go/bin and /tmp/forgeschema-hugo; they are transient. Docker is absent, and the container UID/GID maps permit only root, so native PostgreSQL cannot start through its normal unprivileged workflow. Do not bypass its root protections. GitHub Actions supplies disposable official PostgreSQL 16.10/17.6 services.
-Public shell clone/fetch works; shell push/private clone has no credentials. Use connector create_tree/create_commit/update_ref with expected head SHA. Read fresh heads before editing. Preserve website theme/templates/layout/CSS/structure and the owner's domain configuration.
+## Material limitations
+This is an unreleased prototype, all rights reserved. No public binary release or license change.
+External DDL must be paused. Advisory locks coordinate ForgeSchema clients only; relation locks stabilize existing tables but cannot prohibit every namespace CREATE or outside-schema/database-wide hook. Target verification catches observed unexpected structures, not every race after the check. External dependencies, permissions, comments/grants, data contents and physical dropped-column limits remain outside structural fingerprints.
+ACCESS EXCLUSIVE on all source tables can block application reads and writes. Use a consistent migration role: metadata storage requires exclusive role ownership/ACLs and initial database CREATE permission, plus normal DDL ownership/privileges. Metadata grants are not silently changed.
+Commit connection failures may have unknown outcomes. SQL and target-mismatch rollback were tested; general crash recovery and commit-network-failure fault injection have NOT been established.
+
+## Environment/publishing
+Tools currently /tmp/go/bin and /tmp/forgeschema-hugo, transient. Docker is absent; root-only UID/GID mapping prevents normal native PostgreSQL startup. Do not bypass PostgreSQL root protections. CI provides disposable official PostgreSQL services with test-only credentials.
+Public shell clone/fetch works; private clones/pushes lack credentials. Use GitHub connector create_tree/create_commit/update_ref with expected head SHA and fresh branch reads. Preserve theme/templates/layout/CSS/structure. Website contact address must persist.
 
 ## Next session, only after go-ahead
-Implement execution of an EXACT reviewed plan, not replanning during apply. First add a strict bounded JSON artifact loader that rejects duplicate/unknown fields, null/coerced fields, extra documents and noncanonical/inconsistent artifacts, then invoke Plan.Validate. Ready status alone is insufficient; do not trust embedded SQL. Preserve format version 1 canonical generation unless deliberately versioning changes.
-Require live source fingerprint equality, coordinate competing ForgeSchema runs, acquire suitable relation locks and reinspect with a fresh appropriate snapshot after obtaining locks. Consider DDL races carefully: repeatable-read snapshot acquisition before waiting for locks is not a drift check. Validate resulting schema before commit; record history atomically, configure timeouts and rollback on failure. Refuse unsupported concurrent/nontransactional operations.
-History must not contaminate the managed schema: the inspector rejects reserved forgeschema_ relation names. Design isolated bookkeeping storage with explicit inspection boundaries, not a silent special-case omission.
-Test stale/tampered/blocked plans, two competing runs, SQL failure rollback, target verification and history. The standalone inspector does not enumerate external dependencies; document the coordination limits with external writers and outside-schema objects honestly.
-Finish by publishing code, updating this resume file and website with actual results, reporting commit IDs and pausing for session 5 authorization. No automatic release or license change.
+Session 5: add read-only standalone verify with useful results/exit codes, then appropriate remaining failure cases and end-to-end checks. Reuse canonical schema/inspection functions without writes. Extend CLI documentation and examples accurately.
+Consider coverage of a full multi-operation plan through the actual Apply API, context cancellation, statement timeout, metadata bootstrap failures and transactional history failure. Prioritize meaningful behavior, not mirror tests. Preserve format version 1 compatibility or explicitly version any generator changes. Do not claim general crash safety/commit recovery without evidence.
+Read PLAN.md, APPLY.md, PLANNING.md, SCHEMA.md and INSPECTION.md first. Finish by committing code, updating this file and website with verified results, reporting and pausing for session 6 authorization.

@@ -1,4 +1,4 @@
-// Package postgres inspects a restricted PostgreSQL schema without changing it.
+// Package postgres inspects PostgreSQL schemas and applies supported reviewed migration plans.
 package postgres
 
 import (
