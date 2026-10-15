@@ -1,21 +1,27 @@
 package cli
 
 import (
+	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"github.com/ForgeSchema/forgeschema/postgres"
 	"github.com/ForgeSchema/forgeschema/schema"
 	"io"
 	"os"
+	"time"
 )
 
-const Version = "0.0.1-dev"
+const Version = "0.0.2-dev"
 const usage = `ForgeSchema — PostgreSQL schema evolution prototype
 Usage:
   forgeschema version
   forgeschema validate SCHEMA.yaml
+  forgeschema inspect SCHEMA_NAME
   forgeschema help
 
-This checkpoint validates schema files only. Inspect, plan, apply and verify
-are planned; this binary does not connect to or modify a database.
+Inspection uses DATABASE_URL and reads catalog metadata only, with a 30-second
+timeout. PostgreSQL 16 and 17 are supported. Plan, apply and verify are pending.
 `
 
 func Run(args []string, out, errs io.Writer) int {
@@ -35,6 +41,38 @@ func Run(args []string, out, errs io.Writer) int {
 			return fail(errs, "version takes no arguments", 2)
 		}
 		fmt.Fprintln(out, Version)
+		return 0
+	case "inspect":
+		if len(args) != 2 {
+			return fail(errs, "usage: forgeschema inspect SCHEMA_NAME (set DATABASE_URL)", 2)
+		}
+		if _, err := schema.Normalize(schema.Document{Version: 1, Schema: args[1], Tables: []schema.Table{}}); err != nil {
+			return fail(errs, err.Error(), 1)
+		}
+		dsn := os.Getenv("DATABASE_URL")
+		if dsn == "" {
+			return fail(errs, "DATABASE_URL is required for inspection", 2)
+		}
+		db, err := sql.Open("postgres", dsn)
+		if err != nil {
+			return fail(errs, "invalid database connection configuration", 1)
+		}
+		defer db.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		d, err := postgres.Inspect(ctx, db, args[1])
+		if err != nil {
+			var unsupported *postgres.UnsupportedError
+			if errors.As(err, &unsupported) {
+				return fail(errs, unsupported.Error(), 1)
+			}
+			return fail(errs, "database inspection failed; check connection, permissions, server version and timeout", 1)
+		}
+		b, err := d.CanonicalJSON()
+		if err != nil {
+			return fail(errs, "could not encode inspected schema", 1)
+		}
+		fmt.Fprintln(out, string(b))
 		return 0
 	case "validate":
 		if len(args) != 2 {
