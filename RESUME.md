@@ -1,8 +1,20 @@
 # ForgeSchema resume checkpoint
 
-Updated: 2026-10-15, browser-demo follow-up complete.
+Updated: 2026-10-15, Apache 2.0 license adoption complete.
 
-Status: COMPLETE AND PAUSED. All six original sessions and the explicitly authorized browser-demo follow-up are complete. Await the owner's next direction; do not start another milestone, publish a release, create a tag or change licensing automatically.
+Status: COMPLETE AND PAUSED. All six original sessions, the browser-demo follow-up and Apache 2.0 adoption are complete. Await the owner's next direction; do not start another milestone, publish a release, create a tag or change the selected Apache 2.0 licensing automatically.
+
+## Apache License 2.0 adoption
+
+Owner explicitly requested Apache 2.0 for the website and code repositories on 2026-10-15. Both repositories now contain the full canonical Apache License, Version 2.0 in LICENSE and ForgeSchema attribution in NOTICE. The code README/FEATURES/AGENTS/PLAN and browser-demo documentation reflect the chosen license. Proprietary/all-rights-reserved statements have been removed from current project copy.
+
+Engine license/docs commit: 3646f405aaeea005529576fe8bad84b3409a2b83.
+Website license/content commit: cc432a0f5ff75a8d68eceef2b627fd4c29db9441.
+This resume is a separate checkpoint commit.
+
+The website serves LICENSE.txt and NOTICE.txt, discloses Apache 2.0 in its existing homepage/footer description and About/Build pages, and records the decision in its README and roadmap. The inherited Launch theme retains its MIT license, unchanged at themes/launch/LICENSE.md; THIRD_PARTY_NOTICES.md preserves its attribution verbatim. Engine dependency notices remain unchanged. Apache 2.0 applies to original ForgeSchema work and does not replace third-party licenses.
+
+Validation: all three license copies match /usr/share/common-licenses/Apache-2.0 byte for byte. Hugo 0.158.0 build passed (30 pages, 39 static files); generated internal links/assets resolve; homepage/About/Build include the license disclosure. All 18 theme blobs match the pre-change tree. git diff --check passed. Live HTTPS homepage/About/Build disclose Apache 2.0, and the served LICENSE.txt matches the repository license byte for byte. No executable behavior changed, so no new engine tests were needed for this documentation/license change. No tag, binary release or release automation was added.
 
 ## Browser-demo follow-up
 
@@ -63,7 +75,7 @@ External DDL must be paused. Advisory locks coordinate ForgeSchema clients only;
 
 Verify is READ ONLY/REPEATABLE READ and reads catalog metadata only. It reports supported structural differences without repairs/history writes. A match is a snapshot, not proof of application data, grants/comments, history, commit outcome or future state. The separate harness reads only its own synthetic rows for preservation checks.
 
-Defaults, generated/identity columns, foreign/unique/check constraints, general type/nullability conversion, required additions to existing tables, destructive changes, advanced indexes, backfills, concurrent index builds, other databases, live connected browser UI and MCP remain outside this prototype. Copyright 2026 ForgeSchema; all rights reserved. No binary release, tag or licensing change is authorized.
+Defaults, generated/identity columns, foreign/unique/check constraints, general type/nullability conversion, required additions to existing tables, destructive changes, advanced indexes, backfills, concurrent index builds, other databases, live connected browser UI and MCP remain outside this prototype. Copyright 2026 ForgeSchema. The owner selected Apache License 2.0 for both repositories on 2026-10-15; see LICENSE, NOTICE and third-party notices. No binary release or tag is authorized.
 
 ## Continuation instructions
 
