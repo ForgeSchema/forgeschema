@@ -99,3 +99,22 @@ func TestApplyInputErrors(t *testing.T) {
 		t.Fatalf("unsafe diagnostic %d %s", got, errs.String())
 	}
 }
+
+func TestVerifyInputErrors(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	cases := []struct {
+		args []string
+		code int
+	}{{[]string{"verify"}, 2}, {[]string{"verify", "--plan"}, 2}, {[]string{"verify", "--plan", "../../examples/customer-plan.json"}, 2}, {[]string{"verify", "../../examples/customers.yaml"}, 2}, {[]string{"verify", "missing.yaml"}, 1}, {[]string{"verify", "--plan", "../../examples/customers.yaml"}, 1}}
+	for _, c := range cases {
+		var out, errs bytes.Buffer
+		if got := Run(c.args, &out, &errs); got != c.code || out.Len() != 0 {
+			t.Fatalf("%v: %d %s", c.args, got, errs.String())
+		}
+	}
+	t.Setenv("DATABASE_URL", "postgres://user:secret-never-log@localhost:invalid/db")
+	var out, errs bytes.Buffer
+	if got := Run([]string{"verify", "../../examples/customers.yaml"}, &out, &errs); got != 1 || strings.Contains(errs.String(), "secret-never-log") || out.Len() != 0 {
+		t.Fatalf("unsafe verification error %d %s", got, errs.String())
+	}
+}

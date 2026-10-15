@@ -15,7 +15,7 @@ import (
 	"github.com/ForgeSchema/forgeschema/schema"
 )
 
-const Version = "0.0.4-dev"
+const Version = "0.0.5-dev"
 const usage = `ForgeSchema — PostgreSQL schema evolution prototype
 Usage:
   forgeschema version
@@ -23,12 +23,14 @@ Usage:
   forgeschema inspect SCHEMA_NAME
   forgeschema plan [--explain] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]
   forgeschema apply PLAN.json
+  forgeschema verify EXPECTED.yaml
+  forgeschema verify --plan PLAN.json
   forgeschema help
 
 Inspection uses DATABASE_URL and reads catalog metadata only, with a 30-second
 timeout. PostgreSQL 16 and 17 are supported. Planning is offline and does not
 execute SQL. A blocked plan exits 3. Apply executes an exact reviewed artifact;
-pause external DDL first. Standalone verify is pending.
+pause external DDL first. Verify is read-only and exits 4 on structural drift.
 `
 
 func Run(args []string, out, errs io.Writer) int {
@@ -48,6 +50,59 @@ func Run(args []string, out, errs io.Writer) int {
 			return fail(errs, "version takes no arguments", 2)
 		}
 		fmt.Fprintln(out, Version)
+		return 0
+	case "verify":
+		var expected schema.Document
+		if len(args) == 2 && args[1] != "--plan" {
+			var err error
+			expected, err = loadSchema(args[1])
+			if err != nil {
+				return fail(errs, err.Error(), 1)
+			}
+		} else if len(args) == 3 && args[1] == "--plan" {
+			f, err := os.Open(args[2])
+			if err != nil {
+				return fail(errs, err.Error(), 1)
+			}
+			p, err := plan.Load(f)
+			f.Close()
+			if err != nil {
+				return fail(errs, err.Error(), 1)
+			}
+			if p.Status != "ready" {
+				return fail(errs, "blocked plans cannot be verified as applied targets", 3)
+			}
+			expected = p.Target
+		} else {
+			return fail(errs, "usage: forgeschema verify EXPECTED.yaml | verify --plan PLAN.json (set DATABASE_URL)", 2)
+		}
+		dsn := os.Getenv("DATABASE_URL")
+		if dsn == "" {
+			return fail(errs, "DATABASE_URL is required for verification", 2)
+		}
+		db, err := sql.Open("postgres", dsn)
+		if err != nil {
+			return fail(errs, "invalid database connection configuration", 1)
+		}
+		defer db.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		result, err := postgres.Verify(ctx, db, expected)
+		if err != nil {
+			var unsupported *postgres.UnsupportedError
+			if errors.As(err, &unsupported) {
+				return fail(errs, unsupported.Error(), 1)
+			}
+			return fail(errs, "database verification failed; check connection, permissions, server version and timeout", 1)
+		}
+		b, err := json.Marshal(result)
+		if err != nil {
+			return fail(errs, "could not encode verification result", 1)
+		}
+		fmt.Fprintln(out, string(b))
+		if result.Status == "drift" {
+			return 4
+		}
 		return 0
 	case "apply":
 		if len(args) != 2 {
