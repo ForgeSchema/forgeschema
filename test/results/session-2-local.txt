@@ -1,0 +1,149 @@
+go version go1.26.1 linux/amd64
+?   	github.com/ForgeSchema/forgeschema/cmd/forgeschema	[no test files]
+ok  	github.com/ForgeSchema/forgeschema/internal/cli	(cached)
+ok  	github.com/ForgeSchema/forgeschema/postgres	(cached)
+ok  	github.com/ForgeSchema/forgeschema/schema	(cached)
+{"version":1,"schema":"public","tables":[{"name":"customers","columns":[{"name":"customer_name","type":"text","nullable":false},{"name":"email","type":"text","nullable":true},{"name":"id","type":"bigint","nullable":false}],"primary_key":["id"],"indexes":[{"name":"customers_email_idx","columns":["email"]}]}]}
+{"version":1,"schema":"public","tables":[]}
+=== RUN   TestInspectFixture
+    inspect_test.go:61: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+--- SKIP: TestInspectFixture (0.00s)
+=== RUN   TestEmptyAndMissingSchema
+    inspect_test.go:100: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+--- SKIP: TestEmptyAndMissingSchema (0.00s)
+=== RUN   TestSupportedTypesAndOrdering
+    inspect_test.go:113: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+--- SKIP: TestSupportedTypesAndOrdering (0.00s)
+=== RUN   TestUnsupportedStructures
+=== RUN   TestUnsupportedStructures/array
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/opclass
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/generated
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/custom-type-shadow
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/sequence
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/inheritance
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/unique-index
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/extended-statistics
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/identity
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/varchar
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/view
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/expression-index
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/hash-index
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/index-options
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/rls
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/numeric
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/enum
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/foreign-key
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/descending-index
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/partial-index
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/default
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/policy
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/timestamp-precision
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/materialized-view
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/partition
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/custom-pk-name
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/include-index
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/table-options
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/storage
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/compression
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/domain
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/unlogged
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/deferrable-pk
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/rule
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/quoted-name
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/function
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/check
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/unique
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/nulls-first
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/custom-collation
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+=== RUN   TestUnsupportedStructures/reserved-name
+    inspect_test.go:170: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+--- PASS: TestUnsupportedStructures (0.00s)
+    --- SKIP: TestUnsupportedStructures/array (0.00s)
+    --- SKIP: TestUnsupportedStructures/opclass (0.00s)
+    --- SKIP: TestUnsupportedStructures/generated (0.00s)
+    --- SKIP: TestUnsupportedStructures/custom-type-shadow (0.00s)
+    --- SKIP: TestUnsupportedStructures/sequence (0.00s)
+    --- SKIP: TestUnsupportedStructures/inheritance (0.00s)
+    --- SKIP: TestUnsupportedStructures/unique-index (0.00s)
+    --- SKIP: TestUnsupportedStructures/extended-statistics (0.00s)
+    --- SKIP: TestUnsupportedStructures/identity (0.00s)
+    --- SKIP: TestUnsupportedStructures/varchar (0.00s)
+    --- SKIP: TestUnsupportedStructures/view (0.00s)
+    --- SKIP: TestUnsupportedStructures/expression-index (0.00s)
+    --- SKIP: TestUnsupportedStructures/hash-index (0.00s)
+    --- SKIP: TestUnsupportedStructures/index-options (0.00s)
+    --- SKIP: TestUnsupportedStructures/rls (0.00s)
+    --- SKIP: TestUnsupportedStructures/numeric (0.00s)
+    --- SKIP: TestUnsupportedStructures/enum (0.00s)
+    --- SKIP: TestUnsupportedStructures/foreign-key (0.00s)
+    --- SKIP: TestUnsupportedStructures/descending-index (0.00s)
+    --- SKIP: TestUnsupportedStructures/partial-index (0.00s)
+    --- SKIP: TestUnsupportedStructures/default (0.00s)
+    --- SKIP: TestUnsupportedStructures/policy (0.00s)
+    --- SKIP: TestUnsupportedStructures/timestamp-precision (0.00s)
+    --- SKIP: TestUnsupportedStructures/materialized-view (0.00s)
+    --- SKIP: TestUnsupportedStructures/partition (0.00s)
+    --- SKIP: TestUnsupportedStructures/custom-pk-name (0.00s)
+    --- SKIP: TestUnsupportedStructures/include-index (0.00s)
+    --- SKIP: TestUnsupportedStructures/table-options (0.00s)
+    --- SKIP: TestUnsupportedStructures/storage (0.00s)
+    --- SKIP: TestUnsupportedStructures/compression (0.00s)
+    --- SKIP: TestUnsupportedStructures/domain (0.00s)
+    --- SKIP: TestUnsupportedStructures/unlogged (0.00s)
+    --- SKIP: TestUnsupportedStructures/deferrable-pk (0.00s)
+    --- SKIP: TestUnsupportedStructures/rule (0.00s)
+    --- SKIP: TestUnsupportedStructures/quoted-name (0.00s)
+    --- SKIP: TestUnsupportedStructures/function (0.00s)
+    --- SKIP: TestUnsupportedStructures/check (0.00s)
+    --- SKIP: TestUnsupportedStructures/unique (0.00s)
+    --- SKIP: TestUnsupportedStructures/nulls-first (0.00s)
+    --- SKIP: TestUnsupportedStructures/custom-collation (0.00s)
+    --- SKIP: TestUnsupportedStructures/reserved-name (0.00s)
+=== RUN   TestScopeAndDroppedColumns
+    inspect_test.go:188: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+--- SKIP: TestScopeAndDroppedColumns (0.00s)
+=== RUN   TestReadOnlyRoleAndCancellation
+    inspect_test.go:198: set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database
+--- SKIP: TestReadOnlyRoleAndCancellation (0.00s)
+PASS
+ok  	github.com/ForgeSchema/forgeschema/postgres	0.005s

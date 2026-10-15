@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/ForgeSchema/forgeschema/postgres"
-	"github.com/ForgeSchema/forgeschema/schema"
 	"io"
 	"os"
 	"time"
+
+	"github.com/ForgeSchema/forgeschema/postgres"
+	"github.com/ForgeSchema/forgeschema/schema"
 )
 
 const Version = "0.0.2-dev"

@@ -32,3 +32,22 @@ func TestInvalidFile(t *testing.T) {
 		t.Fatal("missing diagnostic")
 	}
 }
+
+func TestInspectionConfiguration(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	var out, errs bytes.Buffer
+	if got := Run([]string{"inspect", "public"}, &out, &errs); got != 2 || !strings.Contains(errs.String(), "DATABASE_URL") {
+		t.Fatalf("missing configuration: %d %s", got, errs.String())
+	}
+	out.Reset()
+	errs.Reset()
+	t.Setenv("DATABASE_URL", "postgres://user:do-not-print-this@127.0.0.1:invalid/database")
+	if got := Run([]string{"inspect", "public"}, &out, &errs); got != 1 || strings.Contains(errs.String(), "do-not-print-this") || out.Len() != 0 {
+		t.Fatalf("unsafe connection diagnostic: %d %s", got, errs.String())
+	}
+	out.Reset()
+	errs.Reset()
+	if got := Run([]string{"inspect", "public; SELECT 1"}, &out, &errs); got != 1 || out.Len() != 0 {
+		t.Fatalf("invalid scope accepted: %d %s", got, errs.String())
+	}
+}

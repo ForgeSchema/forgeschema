@@ -2,7 +2,7 @@
 
 ForgeSchema is a PostgreSQL schema evolution engine being built in Go. The intended workflow is inspect, plan, apply and verify, with an explained migration artifact between comparison and execution.
 
-Session 2 adds read-only PostgreSQL 16/17 catalog inspection to the strict desired-schema validator. Live integration validation is in progress. Migration planning and execution are not implemented, and this is not a production release.
+Session 2 adds read-only PostgreSQL 16/17 catalog inspection to the strict desired-schema validator. Live integration tests passed on PostgreSQL 16.10 and 17.6. Migration planning and execution are not implemented, and this is not a production release.
 
 ## Try the foundation
 
@@ -19,7 +19,7 @@ go build -o bin/forgeschema ./cmd/forgeschema
 
 Validation prints canonical JSON on success and errors to stderr on failure. Exit codes are 0 for success, 1 for invalid input or file errors, and 2 for command usage errors. See SCHEMA.md for the exact supported contract. The version is 0.0.2-dev; no release binaries are published.
 
-## PostgreSQL fixture for subsequent sessions
+## PostgreSQL fixture
 
 With Docker and Compose available:
 
