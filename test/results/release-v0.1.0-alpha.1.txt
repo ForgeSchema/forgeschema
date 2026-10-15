@@ -1,0 +1,25 @@
+Release v0.1.0-alpha.1 verification, 2026-10-15
+Published prerelease: https://github.com/ForgeSchema/forgeschema/releases/tag/v0.1.0-alpha.1
+Tag/source commit: acbf028db19658ae117cd80cc35c5d76b39ecb94
+Release workflow: https://github.com/ForgeSchema/forgeschema/actions/runs/38709629322
+Independent Test workflow: https://github.com/ForgeSchema/forgeschema/actions/runs/38709629336
+All jobs passed. Public release is not draft and is marked prerelease; six binary archives and SHA256SUMS are attached.
+
+Selected verbatim build job log:
+2026-10-15T09:01:27.8990232Z ./forgeschema_0.1.0-alpha.1_darwin_amd64.tar.gz: OK
+2026-10-15T09:01:27.9005821Z ./forgeschema_0.1.0-alpha.1_darwin_arm64.tar.gz: OK
+2026-10-15T09:01:27.9024275Z ./forgeschema_0.1.0-alpha.1_linux_amd64.tar.gz: OK
+2026-10-15T09:01:27.9041028Z ./forgeschema_0.1.0-alpha.1_linux_arm64.tar.gz: OK
+2026-10-15T09:01:27.9060255Z ./forgeschema_0.1.0-alpha.1_windows_amd64.zip: OK
+2026-10-15T09:01:27.9077358Z ./forgeschema_0.1.0-alpha.1_windows_arm64.zip: OK
+2026-10-15T09:01:27.9080397Z Built six CLI archives and verified SHA256SUMS for 0.1.0-alpha.1
+2026-10-15T09:01:28.0942747Z Artifact name is valid!
+2026-10-15T09:01:30.9562670Z Artifact release-binaries has been successfully uploaded! Final size is 14582126 bytes. Artifact ID is 11959813205
+
+Public verification after publication:
+Downloaded all six binary archives and SHA256SUMS from the public release URLs.
+All six downloaded SHA-256 digests match SHA256SUMS.
+Every archive includes the exact Apache LICENSE, NOTICE and THIRD_PARTY_NOTICES.md.
+Linux binaries have ELF headers; Windows executables have PE/MZ headers.
+The downloaded Linux amd64 executable reports 0.1.0-alpha.1, validates examples/customers.yaml and generates the byte-identical committed example plan.
+Other platform binaries were cross-compiled; native execution on those platforms was not performed. macOS/Windows binaries are unsigned and not notarized.
