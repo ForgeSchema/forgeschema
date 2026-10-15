@@ -1,8 +1,14 @@
 # ForgeSchema resume checkpoint
 
-Updated: 2026-10-15, first alpha release and binaries.
+Updated: 2026-10-15, public website licensing-copy cleanup.
 
 Status: COMPLETE AND PAUSED. All six original sessions, the browser demo, Apache 2.0 adoption and the first alpha release are complete. Await the owner's next direction; do not start another milestone, publish another release, create another tag or change the selected Apache 2.0 licensing automatically.
+
+## Public website licensing-copy cleanup
+
+Owner requested removal of every public mention of licensing related to the website. Website commit cab87ba3dda15612810d06b74506e7ce1b1aafbe removes website/theme licensing discussion from About, Build/download, roadmap, session 6 and the global description. Public LICENSE.txt/NOTICE.txt copies were removed. Engine Apache 2.0 information links directly to the code repository and remains available. Private website repository LICENSE/NOTICE/third-party attribution and theme files are preserved; this was a public copy cleanup, not a license revocation.
+
+Hugo build passed (31 pages, 37 static files); generated internal links/assets resolve, and website-license links/discussion are absent. All 18 theme blobs are unchanged. Live homepage/About/download/roadmap/session-6 pages were checked and no longer contain the removed discussion or license-download links. The first About fetch saw old deployment content; the subsequent fetch confirmed cleanup. AGENTS.md now records the public-copy preference. No engine behavior, release tag or binaries changed. Historical checkpoints below describe the earlier state; this section supersedes their public website licensing-copy descriptions.
 
 ## First public alpha release and binaries
 
