@@ -1,0 +1,405 @@
+GitHub Actions session 5 verification evidence
+Run: https://github.com/ForgeSchema/forgeschema/actions/runs/38699937303
+Job: test (16.10) (116305407791), conclusion: success
+Commit: 45f5402bb45c1a267e60ecc8f9d46d28aab0ed21
+Selected verbatim test lines (container setup omitted).
+
+2026-10-15T07:37:19.8374144Z === RUN   TestCommands
+2026-10-15T07:37:19.8374976Z --- PASS: TestCommands (0.00s)
+2026-10-15T07:37:19.8375523Z === RUN   TestInvalidFile
+2026-10-15T07:37:19.8375958Z --- PASS: TestInvalidFile (0.00s)
+2026-10-15T07:37:19.8376400Z === RUN   TestInspectionConfiguration
+2026-10-15T07:37:19.8376766Z --- PASS: TestInspectionConfiguration (0.00s)
+2026-10-15T07:37:19.8377137Z === RUN   TestPlanCommands
+2026-10-15T07:37:19.8377426Z --- PASS: TestPlanCommands (0.03s)
+2026-10-15T07:37:19.8377814Z === RUN   TestApplyInputErrors
+2026-10-15T07:37:19.8378105Z --- PASS: TestApplyInputErrors (0.02s)
+2026-10-15T07:37:19.8378400Z === RUN   TestVerifyInputErrors
+2026-10-15T07:37:19.8378761Z --- PASS: TestVerifyInputErrors (0.01s)
+2026-10-15T07:37:19.8379239Z PASS
+2026-10-15T07:37:19.8379603Z ok  	github.com/ForgeSchema/forgeschema/internal/cli	1.081s
+2026-10-15T07:37:20.0932648Z === RUN   TestStrictPlanLoad
+2026-10-15T07:37:20.0933259Z === RUN   TestStrictPlanLoad/invalid-root
+2026-10-15T07:37:20.0933728Z === RUN   TestStrictPlanLoad/trailing
+2026-10-15T07:37:20.0934028Z === RUN   TestStrictPlanLoad/oversized
+2026-10-15T07:37:20.0934814Z === RUN   TestStrictPlanLoad/duplicate
+2026-10-15T07:37:20.0935204Z === RUN   TestStrictPlanLoad/duplicate-escaped
+2026-10-15T07:37:20.0935543Z === RUN   TestStrictPlanLoad/null
+2026-10-15T07:37:20.0935831Z === RUN   TestStrictPlanLoad/decimal
+2026-10-15T07:37:20.0936228Z === RUN   TestStrictPlanLoad/tampered-sql
+2026-10-15T07:37:20.0936717Z === RUN   TestStrictPlanLoad/unknown
+2026-10-15T07:37:20.0937207Z === RUN   TestStrictPlanLoad/nested-duplicate
+2026-10-15T07:37:20.0937539Z === RUN   TestStrictPlanLoad/missing-bool
+2026-10-15T07:37:20.0937840Z === RUN   TestStrictPlanLoad/case
+2026-10-15T07:37:20.0938178Z === RUN   TestStrictPlanLoad/quoted-number
+2026-10-15T07:37:20.0938475Z === RUN   TestStrictPlanLoad/missing
+2026-10-15T07:37:20.0938755Z === RUN   TestStrictPlanLoad/bad-utf8
+2026-10-15T07:37:20.0939043Z --- PASS: TestStrictPlanLoad (0.23s)
+2026-10-15T07:37:20.0939440Z     --- PASS: TestStrictPlanLoad/invalid-root (0.00s)
+2026-10-15T07:37:20.0939850Z     --- PASS: TestStrictPlanLoad/trailing (0.00s)
+2026-10-15T07:37:20.0940241Z     --- PASS: TestStrictPlanLoad/oversized (0.14s)
+2026-10-15T07:37:20.0940633Z     --- PASS: TestStrictPlanLoad/duplicate (0.00s)
+2026-10-15T07:37:20.0941045Z     --- PASS: TestStrictPlanLoad/duplicate-escaped (0.00s)
+2026-10-15T07:37:20.0941460Z     --- PASS: TestStrictPlanLoad/null (0.00s)
+2026-10-15T07:37:20.0941824Z     --- PASS: TestStrictPlanLoad/decimal (0.00s)
+2026-10-15T07:37:20.0942219Z     --- PASS: TestStrictPlanLoad/tampered-sql (0.00s)
+2026-10-15T07:37:20.0942602Z     --- PASS: TestStrictPlanLoad/unknown (0.00s)
+2026-10-15T07:37:20.0943406Z     --- PASS: TestStrictPlanLoad/nested-duplicate (0.00s)
+2026-10-15T07:37:20.0943836Z     --- PASS: TestStrictPlanLoad/missing-bool (0.00s)
+2026-10-15T07:37:20.0944225Z     --- PASS: TestStrictPlanLoad/case (0.00s)
+2026-10-15T07:37:20.0944835Z     --- PASS: TestStrictPlanLoad/quoted-number (0.00s)
+2026-10-15T07:37:20.0945221Z     --- PASS: TestStrictPlanLoad/missing (0.00s)
+2026-10-15T07:37:20.0945704Z     --- PASS: TestStrictPlanLoad/bad-utf8 (0.00s)
+2026-10-15T07:37:20.0946100Z === RUN   TestBlockedPlanLoadsButHasNoOperations
+2026-10-15T07:37:20.0946499Z --- PASS: TestBlockedPlanLoadsButHasNoOperations (0.01s)
+2026-10-15T07:37:20.0946852Z === RUN   TestEquivalentSchemas
+2026-10-15T07:37:20.0947368Z --- PASS: TestEquivalentSchemas (0.00s)
+2026-10-15T07:37:20.0947695Z === RUN   TestRenameAndAdd
+2026-10-15T07:37:20.0947959Z --- PASS: TestRenameAndAdd (0.01s)
+2026-10-15T07:37:20.0948257Z === RUN   TestRenameKeyAndIndexReferences
+2026-10-15T07:37:20.0948596Z --- PASS: TestRenameKeyAndIndexReferences (0.00s)
+2026-10-15T07:37:20.0948932Z === RUN   TestCreateQuotedTable
+2026-10-15T07:37:20.0949213Z --- PASS: TestCreateQuotedTable (0.00s)
+2026-10-15T07:37:20.0949511Z === RUN   TestBlockedChangesHaveNoSQL
+2026-10-15T07:37:20.0949828Z === RUN   TestBlockedChangesHaveNoSQL/drop-column
+2026-10-15T07:37:20.0950189Z === RUN   TestBlockedChangesHaveNoSQL/required-column
+2026-10-15T07:37:20.0950548Z === RUN   TestBlockedChangesHaveNoSQL/nullability
+2026-10-15T07:37:20.0950901Z === RUN   TestBlockedChangesHaveNoSQL/index-drop
+2026-10-15T07:37:20.0951255Z === RUN   TestBlockedChangesHaveNoSQL/implicit-rename
+2026-10-15T07:37:20.0951605Z === RUN   TestBlockedChangesHaveNoSQL/drop-table
+2026-10-15T07:37:20.0951971Z === RUN   TestBlockedChangesHaveNoSQL/type-change
+2026-10-15T07:37:20.0952320Z === RUN   TestBlockedChangesHaveNoSQL/pk-change
+2026-10-15T07:37:20.0952675Z === RUN   TestBlockedChangesHaveNoSQL/index-change
+2026-10-15T07:37:20.0953026Z --- PASS: TestBlockedChangesHaveNoSQL (0.04s)
+2026-10-15T07:37:20.0953479Z     --- PASS: TestBlockedChangesHaveNoSQL/drop-column (0.00s)
+2026-10-15T07:37:20.0954101Z     --- PASS: TestBlockedChangesHaveNoSQL/required-column (0.00s)
+2026-10-15T07:37:20.0955004Z     --- PASS: TestBlockedChangesHaveNoSQL/nullability (0.00s)
+2026-10-15T07:37:20.0955966Z     --- PASS: TestBlockedChangesHaveNoSQL/index-drop (0.00s)
+2026-10-15T07:37:20.0956952Z     --- PASS: TestBlockedChangesHaveNoSQL/implicit-rename (0.00s)
+2026-10-15T07:37:20.0957879Z     --- PASS: TestBlockedChangesHaveNoSQL/drop-table (0.00s)
+2026-10-15T07:37:20.0958714Z     --- PASS: TestBlockedChangesHaveNoSQL/type-change (0.00s)
+2026-10-15T07:37:20.0959571Z     --- PASS: TestBlockedChangesHaveNoSQL/pk-change (0.00s)
+2026-10-15T07:37:20.0960567Z     --- PASS: TestBlockedChangesHaveNoSQL/index-change (0.00s)
+2026-10-15T07:37:20.0961235Z === RUN   TestInvalidRenameIntent
+2026-10-15T07:37:20.0961749Z --- PASS: TestInvalidRenameIntent (0.01s)
+2026-10-15T07:37:20.0962375Z === RUN   TestTamperingRejected
+2026-10-15T07:37:20.0962990Z --- PASS: TestTamperingRejected (0.02s)
+2026-10-15T07:37:20.0963702Z === RUN   TestStrictRenames
+2026-10-15T07:37:20.0964310Z --- PASS: TestStrictRenames (0.00s)
+2026-10-15T07:37:20.0965370Z === RUN   TestDifferentSchemasAndInvalidInput
+2026-10-15T07:37:20.0966108Z --- PASS: TestDifferentSchemasAndInvalidInput (0.00s)
+2026-10-15T07:37:20.0966782Z === RUN   FuzzPlanLoader
+2026-10-15T07:37:20.0967291Z === RUN   FuzzPlanLoader/seed#0
+2026-10-15T07:37:20.0967763Z === RUN   FuzzPlanLoader/seed#1
+2026-10-15T07:37:20.0968254Z === RUN   FuzzPlanLoader/seed#2
+2026-10-15T07:37:20.0968794Z --- PASS: FuzzPlanLoader (0.00s)
+2026-10-15T07:37:20.0969383Z     --- PASS: FuzzPlanLoader/seed#0 (0.00s)
+2026-10-15T07:37:20.0970063Z     --- PASS: FuzzPlanLoader/seed#1 (0.00s)
+2026-10-15T07:37:20.0970856Z     --- PASS: FuzzPlanLoader/seed#2 (0.00s)
+2026-10-15T07:37:20.0971317Z PASS
+2026-10-15T07:37:20.0971789Z ok  	github.com/ForgeSchema/forgeschema/plan	1.337s
+2026-10-15T07:37:23.5091204Z === RUN   TestApplySuccessHistoryAndReplay
+2026-10-15T07:37:23.5092647Z     apply_test.go:61: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5093376Z --- PASS: TestApplySuccessHistoryAndReplay (0.14s)
+2026-10-15T07:37:23.5093979Z === RUN   TestApplyNoOpAndInvalidPlans
+2026-10-15T07:37:23.5094987Z     apply_test.go:107: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5095670Z --- PASS: TestApplyNoOpAndInvalidPlans (0.06s)
+2026-10-15T07:37:23.5096237Z === RUN   TestApplyCompetingRuns
+2026-10-15T07:37:23.5096955Z     apply_test.go:136: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5097588Z --- PASS: TestApplyCompetingRuns (0.11s)
+2026-10-15T07:37:23.5098164Z === RUN   TestApplyFreshDriftCheckAfterLockWait
+2026-10-15T07:37:23.5099028Z     apply_test.go:187: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5099470Z --- PASS: TestApplyFreshDriftCheckAfterLockWait (0.08s)
+2026-10-15T07:37:23.5099834Z === RUN   TestApplyLockTimeout
+2026-10-15T07:37:23.5100247Z     apply_test.go:214: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5100632Z --- PASS: TestApplyLockTimeout (0.19s)
+2026-10-15T07:37:23.5100955Z === RUN   TestApplyExecutionFailureRollsBackAll
+2026-10-15T07:37:23.5101424Z     apply_test.go:249: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5101832Z --- PASS: TestApplyExecutionFailureRollsBackAll (0.08s)
+2026-10-15T07:37:23.5102212Z === RUN   TestApplyTargetVerificationRollsBack
+2026-10-15T07:37:23.5102649Z     apply_test.go:272: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5103045Z --- PASS: TestApplyTargetVerificationRollsBack (0.09s)
+2026-10-15T07:37:23.5103374Z === RUN   TestApplyCLI
+2026-10-15T07:37:23.5103745Z     apply_test.go:291: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5104090Z --- PASS: TestApplyCLI (0.09s)
+2026-10-15T07:37:23.5104620Z === RUN   TestApplyRejectsModifiedHistory
+2026-10-15T07:37:23.5105235Z     apply_test.go:309: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5105632Z --- PASS: TestApplyRejectsModifiedHistory (0.13s)
+2026-10-15T07:37:23.5106111Z === RUN   TestApplyInvalidOptions
+2026-10-15T07:37:23.5106538Z     apply_test.go:336: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5106901Z --- PASS: TestApplyInvalidOptions (0.04s)
+2026-10-15T07:37:23.5107422Z === RUN   TestApplyFreezesCallerArtifactBeforeLockWait
+2026-10-15T07:37:23.5107906Z     apply_test.go:346: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5108485Z --- PASS: TestApplyFreezesCallerArtifactBeforeLockWait (0.10s)
+2026-10-15T07:37:23.5108888Z === RUN   TestInspectFixture
+2026-10-15T07:37:23.5109317Z     inspect_test.go:61: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5109851Z --- PASS: TestInspectFixture (0.08s)
+2026-10-15T07:37:23.5110152Z === RUN   TestEmptyAndMissingSchema
+2026-10-15T07:37:23.5110583Z     inspect_test.go:100: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5111127Z --- PASS: TestEmptyAndMissingSchema (0.02s)
+2026-10-15T07:37:23.5111452Z === RUN   TestSupportedTypesAndOrdering
+2026-10-15T07:37:23.5112009Z     inspect_test.go:113: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5112411Z --- PASS: TestSupportedTypesAndOrdering (0.03s)
+2026-10-15T07:37:23.5112740Z === RUN   TestUnsupportedStructures
+2026-10-15T07:37:23.5113125Z === RUN   TestUnsupportedStructures/unique
+2026-10-15T07:37:23.5113617Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5114005Z === RUN   TestUnsupportedStructures/deferrable-pk
+2026-10-15T07:37:23.5115221Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5115838Z === RUN   TestUnsupportedStructures/include-index
+2026-10-15T07:37:23.5116309Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5116838Z === RUN   TestUnsupportedStructures/opclass
+2026-10-15T07:37:23.5117291Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5117669Z === RUN   TestUnsupportedStructures/index-options
+2026-10-15T07:37:23.5118466Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5118840Z === RUN   TestUnsupportedStructures/array
+2026-10-15T07:37:23.5119433Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5119799Z === RUN   TestUnsupportedStructures/enum
+2026-10-15T07:37:23.5120372Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5120762Z === RUN   TestUnsupportedStructures/partial-index
+2026-10-15T07:37:23.5121218Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5121749Z === RUN   TestUnsupportedStructures/quoted-name
+2026-10-15T07:37:23.5146081Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5146741Z === RUN   TestUnsupportedStructures/identity
+2026-10-15T07:37:23.5147266Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5147695Z === RUN   TestUnsupportedStructures/unique-index
+2026-10-15T07:37:23.5148339Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5148741Z === RUN   TestUnsupportedStructures/compression
+2026-10-15T07:37:23.5149193Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5149630Z === RUN   TestUnsupportedStructures/view
+2026-10-15T07:37:23.5150057Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5150595Z === RUN   TestUnsupportedStructures/inheritance
+2026-10-15T07:37:23.5151038Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5151414Z === RUN   TestUnsupportedStructures/hash-index
+2026-10-15T07:37:23.5151867Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5152223Z === RUN   TestUnsupportedStructures/rls
+2026-10-15T07:37:23.5152644Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5153011Z === RUN   TestUnsupportedStructures/policy
+2026-10-15T07:37:23.5153452Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5153855Z === RUN   TestUnsupportedStructures/extended-statistics
+2026-10-15T07:37:23.5154618Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5155003Z === RUN   TestUnsupportedStructures/default
+2026-10-15T07:37:23.5155563Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5155963Z === RUN   TestUnsupportedStructures/timestamp-precision
+2026-10-15T07:37:23.5156425Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5156795Z === RUN   TestUnsupportedStructures/sequence
+2026-10-15T07:37:23.5157239Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5157612Z === RUN   TestUnsupportedStructures/partition
+2026-10-15T07:37:23.5158049Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5158427Z === RUN   TestUnsupportedStructures/nulls-first
+2026-10-15T07:37:23.5158886Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5159269Z === RUN   TestUnsupportedStructures/generated
+2026-10-15T07:37:23.5159708Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5160076Z === RUN   TestUnsupportedStructures/domain
+2026-10-15T07:37:23.5160514Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5160936Z === RUN   TestUnsupportedStructures/custom-type-shadow
+2026-10-15T07:37:23.5161553Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5161955Z === RUN   TestUnsupportedStructures/custom-pk-name
+2026-10-15T07:37:23.5162415Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5162804Z === RUN   TestUnsupportedStructures/descending-index
+2026-10-15T07:37:23.5163259Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5163799Z === RUN   TestUnsupportedStructures/storage
+2026-10-15T07:37:23.5164247Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5164896Z === RUN   TestUnsupportedStructures/reserved-name
+2026-10-15T07:37:23.5165353Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5165729Z === RUN   TestUnsupportedStructures/function
+2026-10-15T07:37:23.5166195Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5166576Z === RUN   TestUnsupportedStructures/numeric
+2026-10-15T07:37:23.5167011Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5167556Z === RUN   TestUnsupportedStructures/materialized-view
+2026-10-15T07:37:23.5168042Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5168403Z === RUN   TestUnsupportedStructures/check
+2026-10-15T07:37:23.5168827Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5169213Z === RUN   TestUnsupportedStructures/foreign-key
+2026-10-15T07:37:23.5169700Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5170082Z === RUN   TestUnsupportedStructures/table-options
+2026-10-15T07:37:23.5170527Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5170890Z === RUN   TestUnsupportedStructures/varchar
+2026-10-15T07:37:23.5171316Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5171685Z === RUN   TestUnsupportedStructures/unlogged
+2026-10-15T07:37:23.5172116Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5172521Z === RUN   TestUnsupportedStructures/expression-index
+2026-10-15T07:37:23.5173789Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5174174Z === RUN   TestUnsupportedStructures/rule
+2026-10-15T07:37:23.5174863Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5175276Z === RUN   TestUnsupportedStructures/custom-collation
+2026-10-15T07:37:23.5175731Z     inspect_test.go:170: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5176102Z --- PASS: TestUnsupportedStructures (1.00s)
+2026-10-15T07:37:23.5176498Z     --- PASS: TestUnsupportedStructures/unique (0.03s)
+2026-10-15T07:37:23.5176951Z     --- PASS: TestUnsupportedStructures/deferrable-pk (0.03s)
+2026-10-15T07:37:23.5177415Z     --- PASS: TestUnsupportedStructures/include-index (0.03s)
+2026-10-15T07:37:23.5177886Z     --- PASS: TestUnsupportedStructures/opclass (0.03s)
+2026-10-15T07:37:23.5178380Z     --- PASS: TestUnsupportedStructures/index-options (0.03s)
+2026-10-15T07:37:23.5178810Z     --- PASS: TestUnsupportedStructures/array (0.02s)
+2026-10-15T07:37:23.5179206Z     --- PASS: TestUnsupportedStructures/enum (0.02s)
+2026-10-15T07:37:23.5179639Z     --- PASS: TestUnsupportedStructures/partial-index (0.03s)
+2026-10-15T07:37:23.5180082Z     --- PASS: TestUnsupportedStructures/quoted-name (0.03s)
+2026-10-15T07:37:23.5180519Z     --- PASS: TestUnsupportedStructures/identity (0.02s)
+2026-10-15T07:37:23.5180954Z     --- PASS: TestUnsupportedStructures/unique-index (0.03s)
+2026-10-15T07:37:23.5181407Z     --- PASS: TestUnsupportedStructures/compression (0.03s)
+2026-10-15T07:37:23.5181825Z     --- PASS: TestUnsupportedStructures/view (0.02s)
+2026-10-15T07:37:23.5182242Z     --- PASS: TestUnsupportedStructures/inheritance (0.02s)
+2026-10-15T07:37:23.5182683Z     --- PASS: TestUnsupportedStructures/hash-index (0.03s)
+2026-10-15T07:37:23.5183144Z     --- PASS: TestUnsupportedStructures/rls (0.02s)
+2026-10-15T07:37:23.5183558Z     --- PASS: TestUnsupportedStructures/policy (0.02s)
+2026-10-15T07:37:23.5184021Z     --- PASS: TestUnsupportedStructures/extended-statistics (0.02s)
+2026-10-15T07:37:23.5184764Z     --- PASS: TestUnsupportedStructures/default (0.02s)
+2026-10-15T07:37:23.5185490Z     --- PASS: TestUnsupportedStructures/timestamp-precision (0.03s)
+2026-10-15T07:37:23.5186518Z     --- PASS: TestUnsupportedStructures/sequence (0.02s)
+2026-10-15T07:37:23.5187262Z     --- PASS: TestUnsupportedStructures/partition (0.02s)
+2026-10-15T07:37:23.5188066Z     --- PASS: TestUnsupportedStructures/nulls-first (0.03s)
+2026-10-15T07:37:23.5188854Z     --- PASS: TestUnsupportedStructures/generated (0.02s)
+2026-10-15T07:37:23.5189787Z     --- PASS: TestUnsupportedStructures/domain (0.02s)
+2026-10-15T07:37:23.5190516Z     --- PASS: TestUnsupportedStructures/custom-type-shadow (0.02s)
+2026-10-15T07:37:23.5191007Z     --- PASS: TestUnsupportedStructures/custom-pk-name (0.03s)
+2026-10-15T07:37:23.5191494Z     --- PASS: TestUnsupportedStructures/descending-index (0.03s)
+2026-10-15T07:37:23.5192111Z     --- PASS: TestUnsupportedStructures/storage (0.03s)
+2026-10-15T07:37:23.5192552Z     --- PASS: TestUnsupportedStructures/reserved-name (0.03s)
+2026-10-15T07:37:23.5192997Z     --- PASS: TestUnsupportedStructures/function (0.02s)
+2026-10-15T07:37:23.5193407Z     --- PASS: TestUnsupportedStructures/numeric (0.03s)
+2026-10-15T07:37:23.5193864Z     --- PASS: TestUnsupportedStructures/materialized-view (0.02s)
+2026-10-15T07:37:23.5194305Z     --- PASS: TestUnsupportedStructures/check (0.03s)
+2026-10-15T07:37:23.5195031Z     --- PASS: TestUnsupportedStructures/foreign-key (0.03s)
+2026-10-15T07:37:23.5195490Z     --- PASS: TestUnsupportedStructures/table-options (0.02s)
+2026-10-15T07:37:23.5195922Z     --- PASS: TestUnsupportedStructures/varchar (0.03s)
+2026-10-15T07:37:23.5196335Z     --- PASS: TestUnsupportedStructures/unlogged (0.02s)
+2026-10-15T07:37:23.5196788Z     --- PASS: TestUnsupportedStructures/expression-index (0.03s)
+2026-10-15T07:37:23.5197218Z     --- PASS: TestUnsupportedStructures/rule (0.02s)
+2026-10-15T07:37:23.5197669Z     --- PASS: TestUnsupportedStructures/custom-collation (0.03s)
+2026-10-15T07:37:23.5198036Z === RUN   TestScopeAndDroppedColumns
+2026-10-15T07:37:23.5198484Z     inspect_test.go:188: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5198878Z --- PASS: TestScopeAndDroppedColumns (0.03s)
+2026-10-15T07:37:23.5199207Z === RUN   TestReadOnlyRoleAndCancellation
+2026-10-15T07:37:23.5199643Z     inspect_test.go:198: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5200045Z --- PASS: TestReadOnlyRoleAndCancellation (0.03s)
+2026-10-15T07:37:23.5200401Z === RUN   TestGeneratedPlanSQLAgainstPostgres
+2026-10-15T07:37:23.5200902Z     plan_integration_test.go:18: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5201717Z     plan_integration_test.go:102: Executed 6 generated operations; snapshot matches target and both original rows are intact
+2026-10-15T07:37:23.5202355Z --- PASS: TestGeneratedPlanSQLAgainstPostgres (0.05s)
+2026-10-15T07:37:23.5202715Z === RUN   TestVerifyReadOnlyRoleAndDrift
+2026-10-15T07:37:23.5203155Z     verify_test.go:22: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5203550Z --- PASS: TestVerifyReadOnlyRoleAndDrift (0.05s)
+2026-10-15T07:37:23.5203909Z === RUN   TestVerifyUnsupportedAndCancelled
+2026-10-15T07:37:23.5204652Z     verify_test.go:47: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5205101Z --- PASS: TestVerifyUnsupportedAndCancelled (0.04s)
+2026-10-15T07:37:23.5205471Z === RUN   TestFullCLIWorkflowAndVerification
+2026-10-15T07:37:23.5205932Z     verify_test.go:82: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5207128Z     verify_test.go:158: Full inspect → plan → apply → verify workflow passed: six operations, preserved rows, later drift detected without repair
+2026-10-15T07:37:23.5207821Z --- PASS: TestFullCLIWorkflowAndVerification (0.27s)
+2026-10-15T07:37:23.5208179Z === RUN   TestVerifyRejectsBlockedPlan
+2026-10-15T07:37:23.5208627Z     verify_test.go:161: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5209018Z --- PASS: TestVerifyRejectsBlockedPlan (0.04s)
+2026-10-15T07:37:23.5209358Z === RUN   TestApplyCancellationReleasesLocks
+2026-10-15T07:37:23.5209791Z     verify_test.go:178: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5210353Z --- PASS: TestApplyCancellationReleasesLocks (0.11s)
+2026-10-15T07:37:23.5210711Z === RUN   TestApplyStatementTimeoutRollsBack
+2026-10-15T07:37:23.5211140Z     verify_test.go:219: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5211527Z --- PASS: TestApplyStatementTimeoutRollsBack (0.28s)
+2026-10-15T07:37:23.5211900Z === RUN   TestApplyMetadataBootstrapFailureIsAtomic
+2026-10-15T07:37:23.5212381Z     verify_test.go:265: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5212812Z --- PASS: TestApplyMetadataBootstrapFailureIsAtomic (0.07s)
+2026-10-15T07:37:23.5213219Z === RUN   TestApplyHistoryInsertFailureRollsBackDDL
+2026-10-15T07:37:23.5213799Z     verify_test.go:288: PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1)
+2026-10-15T07:37:23.5214238Z --- PASS: TestApplyHistoryInsertFailureRollsBackDDL (0.14s)
+2026-10-15T07:37:23.5214826Z PASS
+2026-10-15T07:37:23.5215095Z ok  	github.com/ForgeSchema/forgeschema/postgres	4.356s
+2026-10-15T07:37:23.5215445Z === RUN   TestCompareMatchAndOrdering
+2026-10-15T07:37:23.5215783Z --- PASS: TestCompareMatchAndOrdering (0.00s)
+2026-10-15T07:37:23.5216107Z === RUN   TestCompareDifferenceKinds
+2026-10-15T07:37:23.5216432Z === RUN   TestCompareDifferenceKinds/column_missing
+2026-10-15T07:37:23.5216805Z === RUN   TestCompareDifferenceKinds/column_unexpected
+2026-10-15T07:37:23.5217168Z === RUN   TestCompareDifferenceKinds/column_type
+2026-10-15T07:37:23.5217518Z === RUN   TestCompareDifferenceKinds/index_missing
+2026-10-15T07:37:23.5217865Z === RUN   TestCompareDifferenceKinds/index_columns
+2026-10-15T07:37:23.5218203Z === RUN   TestCompareDifferenceKinds/table_missing
+2026-10-15T07:37:23.5218557Z === RUN   TestCompareDifferenceKinds/table_unexpected
+2026-10-15T07:37:23.5218931Z === RUN   TestCompareDifferenceKinds/column_nullability
+2026-10-15T07:37:23.5219316Z === RUN   TestCompareDifferenceKinds/primary_key_columns
+2026-10-15T07:37:23.5219684Z === RUN   TestCompareDifferenceKinds/index_unexpected
+2026-10-15T07:37:23.5220036Z --- PASS: TestCompareDifferenceKinds (0.03s)
+2026-10-15T07:37:23.5220472Z     --- PASS: TestCompareDifferenceKinds/column_missing (0.00s)
+2026-10-15T07:37:23.5220970Z     --- PASS: TestCompareDifferenceKinds/column_unexpected (0.00s)
+2026-10-15T07:37:23.5221448Z     --- PASS: TestCompareDifferenceKinds/column_type (0.00s)
+2026-10-15T07:37:23.5221913Z     --- PASS: TestCompareDifferenceKinds/index_missing (0.00s)
+2026-10-15T07:37:23.5222371Z     --- PASS: TestCompareDifferenceKinds/index_columns (0.00s)
+2026-10-15T07:37:23.5222821Z     --- PASS: TestCompareDifferenceKinds/table_missing (0.00s)
+2026-10-15T07:37:23.5223285Z     --- PASS: TestCompareDifferenceKinds/table_unexpected (0.00s)
+2026-10-15T07:37:23.5223791Z     --- PASS: TestCompareDifferenceKinds/column_nullability (0.00s)
+2026-10-15T07:37:23.5224298Z     --- PASS: TestCompareDifferenceKinds/primary_key_columns (0.00s)
+2026-10-15T07:37:23.5225057Z     --- PASS: TestCompareDifferenceKinds/index_unexpected (0.00s)
+2026-10-15T07:37:23.5225444Z === RUN   TestCompareOrderedKeysAndIndexes
+2026-10-15T07:37:23.5225802Z --- PASS: TestCompareOrderedKeysAndIndexes (0.00s)
+2026-10-15T07:37:23.5226142Z === RUN   TestCompareInvalidInputs
+2026-10-15T07:37:23.5226438Z --- PASS: TestCompareInvalidInputs (0.00s)
+2026-10-15T07:37:23.5226740Z === RUN   TestLoadAndCanonical
+2026-10-15T07:37:23.5227018Z --- PASS: TestLoadAndCanonical (0.00s)
+2026-10-15T07:37:23.5227306Z === RUN   TestRejectInvalidYAML
+2026-10-15T07:37:23.5227593Z === RUN   TestRejectInvalidYAML/quoted-version
+2026-10-15T07:37:23.5227915Z === RUN   TestRejectInvalidYAML/alias
+2026-10-15T07:37:23.5228212Z === RUN   TestRejectInvalidYAML/multi
+2026-10-15T07:37:23.5228516Z === RUN   TestRejectInvalidYAML/missing-version
+2026-10-15T07:37:23.5228850Z === RUN   TestRejectInvalidYAML/invalid-name
+2026-10-15T07:37:23.5229181Z === RUN   TestRejectInvalidYAML/missing-pk-column
+2026-10-15T07:37:23.5229520Z === RUN   TestRejectInvalidYAML/empty-index
+2026-10-15T07:37:23.5229840Z === RUN   TestRejectInvalidYAML/missing-tables
+2026-10-15T07:37:23.5230302Z === RUN   TestRejectInvalidYAML/quoted-bool
+2026-10-15T07:37:23.5230623Z === RUN   TestRejectInvalidYAML/nested-unknown
+2026-10-15T07:37:23.5230958Z === RUN   TestRejectInvalidYAML/unsupported-type
+2026-10-15T07:37:23.5231287Z === RUN   TestRejectInvalidYAML/nullable-pk
+2026-10-15T07:37:23.5231616Z === RUN   TestRejectInvalidYAML/duplicate-pk-column
+2026-10-15T07:37:23.5231980Z === RUN   TestRejectInvalidYAML/missing-index-column
+2026-10-15T07:37:23.5232352Z === RUN   TestRejectInvalidYAML/index-table-collision
+2026-10-15T07:37:23.5232687Z === RUN   TestRejectInvalidYAML/unknown
+2026-10-15T07:37:23.5232979Z === RUN   TestRejectInvalidYAML/empty
+2026-10-15T07:37:23.5233268Z === RUN   TestRejectInvalidYAML/anchor
+2026-10-15T07:37:23.5233744Z === RUN   TestRejectInvalidYAML/tag
+2026-10-15T07:37:23.5234048Z === RUN   TestRejectInvalidYAML/reserved-schema
+2026-10-15T07:37:23.5234640Z === RUN   TestRejectInvalidYAML/index-pk-collision
+2026-10-15T07:37:23.5234991Z === RUN   TestRejectInvalidYAML/oversized
+2026-10-15T07:37:23.5235304Z === RUN   TestRejectInvalidYAML/duplicate
+2026-10-15T07:37:23.5235597Z === RUN   TestRejectInvalidYAML/null
+2026-10-15T07:37:23.5235898Z === RUN   TestRejectInvalidYAML/number-as-name
+2026-10-15T07:37:23.5236213Z --- PASS: TestRejectInvalidYAML (0.06s)
+2026-10-15T07:37:23.5236608Z     --- PASS: TestRejectInvalidYAML/quoted-version (0.00s)
+2026-10-15T07:37:23.5237017Z     --- PASS: TestRejectInvalidYAML/alias (0.00s)
+2026-10-15T07:37:23.5237390Z     --- PASS: TestRejectInvalidYAML/multi (0.00s)
+2026-10-15T07:37:23.5237807Z     --- PASS: TestRejectInvalidYAML/missing-version (0.00s)
+2026-10-15T07:37:23.5238242Z     --- PASS: TestRejectInvalidYAML/invalid-name (0.00s)
+2026-10-15T07:37:23.5238694Z     --- PASS: TestRejectInvalidYAML/missing-pk-column (0.00s)
+2026-10-15T07:37:23.5239127Z     --- PASS: TestRejectInvalidYAML/empty-index (0.00s)
+2026-10-15T07:37:23.5239551Z     --- PASS: TestRejectInvalidYAML/missing-tables (0.00s)
+2026-10-15T07:37:23.5239974Z     --- PASS: TestRejectInvalidYAML/quoted-bool (0.00s)
+2026-10-15T07:37:23.5240396Z     --- PASS: TestRejectInvalidYAML/nested-unknown (0.00s)
+2026-10-15T07:37:23.5240839Z     --- PASS: TestRejectInvalidYAML/unsupported-type (0.00s)
+2026-10-15T07:37:23.5241268Z     --- PASS: TestRejectInvalidYAML/nullable-pk (0.00s)
+2026-10-15T07:37:23.5241718Z     --- PASS: TestRejectInvalidYAML/duplicate-pk-column (0.00s)
+2026-10-15T07:37:23.5242196Z     --- PASS: TestRejectInvalidYAML/missing-index-column (0.00s)
+2026-10-15T07:37:23.5242680Z     --- PASS: TestRejectInvalidYAML/index-table-collision (0.00s)
+2026-10-15T07:37:23.5243113Z     --- PASS: TestRejectInvalidYAML/unknown (0.00s)
+2026-10-15T07:37:23.5243505Z     --- PASS: TestRejectInvalidYAML/empty (0.00s)
+2026-10-15T07:37:23.5243890Z     --- PASS: TestRejectInvalidYAML/anchor (0.00s)
+2026-10-15T07:37:23.5244266Z     --- PASS: TestRejectInvalidYAML/tag (0.00s)
+2026-10-15T07:37:23.5245187Z     --- PASS: TestRejectInvalidYAML/reserved-schema (0.00s)
+2026-10-15T07:37:23.5245670Z     --- PASS: TestRejectInvalidYAML/index-pk-collision (0.00s)
+2026-10-15T07:37:23.5246112Z     --- PASS: TestRejectInvalidYAML/oversized (0.02s)
+2026-10-15T07:37:23.5246516Z     --- PASS: TestRejectInvalidYAML/duplicate (0.00s)
+2026-10-15T07:37:23.5246900Z     --- PASS: TestRejectInvalidYAML/null (0.00s)
+2026-10-15T07:37:23.5247323Z     --- PASS: TestRejectInvalidYAML/number-as-name (0.00s)
+2026-10-15T07:37:23.5247661Z === RUN   TestDirectValidation
+2026-10-15T07:37:23.5247937Z --- PASS: TestDirectValidation (0.00s)
+2026-10-15T07:37:23.5248216Z === RUN   TestExamples
+2026-10-15T07:37:23.5248463Z --- PASS: TestExamples (0.00s)
+2026-10-15T07:37:23.5248734Z === RUN   TestKeyOrderSignificant
+2026-10-15T07:37:23.5249030Z --- PASS: TestKeyOrderSignificant (0.00s)
+2026-10-15T07:37:23.5249334Z === RUN   TestLimitsAndKeyAnchors
+2026-10-15T07:37:23.5249624Z --- PASS: TestLimitsAndKeyAnchors (0.03s)
+2026-10-15T07:37:23.5249900Z === RUN   FuzzLoad
+2026-10-15T07:37:23.5250114Z === RUN   FuzzLoad/seed#0
+2026-10-15T07:37:23.5250513Z === RUN   FuzzLoad/seed#1
+2026-10-15T07:37:23.5250750Z --- PASS: FuzzLoad (0.00s)
+2026-10-15T07:37:23.5251029Z     --- PASS: FuzzLoad/seed#0 (0.00s)
+2026-10-15T07:37:23.5251341Z     --- PASS: FuzzLoad/seed#1 (0.00s)
+2026-10-15T07:37:23.5251581Z PASS
+2026-10-15T07:37:23.5251828Z ok  	github.com/ForgeSchema/forgeschema/schema	1.152s
+2026-10-15T07:37:24.7236229Z  2026-10-15 07:37:06.487 UTC [1] LOG:  starting PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-10-15T07:37:24.7260732Z  waiting for server to start....2026-10-15 07:37:06.180 UTC [48] LOG:  starting PostgreSQL 16.10 (Debian 16.10-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+
