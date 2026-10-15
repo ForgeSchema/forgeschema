@@ -36,4 +36,4 @@ Existing-table foreign keys and unique-constraint evolution, general type conver
 Reserve the last 20–30 minutes of every session for validation and handoff. Commit and push completed code and documentation to ForgeSchema/forgeschema. Update RESUME.md with completed work, exact commands and results, known failures, decisions and the next concrete task. Update the website repository photozeitgeist/forgeschema.com with matching public progress; preserve its template and structure. Record both repository commit IDs and any deployment uncertainty. Report to the owner and stop. Start only the next session after an explicit go-ahead; one go-ahead never authorizes all remaining sessions.
 
 ## Current state
-Planning checkpoint completed on 2026-10-15. No engine code exists. All six development sessions are pending. Session 1 requires an explicit go-ahead.
+Session 1 completed on 2026-10-15. The Go foundation and strict schema validator are implemented and the inherited website content has been replaced. Sessions 2–6 remain pending. Session 2 requires an explicit go-ahead. See RESUME.md for validation evidence and limitations.

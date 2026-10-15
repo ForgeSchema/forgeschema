@@ -1,0 +1,16 @@
+go version go1.26.1 linux/amd64
+?   	github.com/ForgeSchema/forgeschema/cmd/forgeschema	[no test files]
+ok  	github.com/ForgeSchema/forgeschema/internal/cli	(cached)
+ok  	github.com/ForgeSchema/forgeschema/schema	(cached)
+{"version":1,"schema":"public","tables":[{"name":"customers","columns":[{"name":"customer_name","type":"text","nullable":false},{"name":"email","type":"text","nullable":true},{"name":"id","type":"bigint","nullable":false}],"primary_key":["id"],"indexes":[{"name":"customers_email_idx","columns":["email"]}]}]}
+{"version":1,"schema":"public","tables":[]}
+fuzz: elapsed: 0s, gathering baseline coverage: 0/86 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 86/86 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 11813 (3936/sec), new interesting: 5 (total: 91)
+fuzz: elapsed: 6s, execs: 11813 (0/sec), new interesting: 5 (total: 91)
+fuzz: elapsed: 6s, execs: 11813 (0/sec), new interesting: 5 (total: 91)
+PASS
+ok  	github.com/ForgeSchema/forgeschema/schema	6.017s
+	github.com/ForgeSchema/forgeschema/cmd/forgeschema		coverage: 0.0% of statements
+ok  	github.com/ForgeSchema/forgeschema/internal/cli	(cached)	coverage: 93.1% of statements
+ok  	github.com/ForgeSchema/forgeschema/schema	0.011s	coverage: 89.9% of statements
