@@ -2,7 +2,7 @@
 
 ForgeSchema is a PostgreSQL schema evolution engine being built in Go. The intended workflow is inspect, plan, apply and verify, with an explained migration artifact between comparison and execution.
 
-Session 2 adds read-only PostgreSQL 16/17 catalog inspection to the strict desired-schema validator. Live integration tests passed on PostgreSQL 16.10 and 17.6. Migration planning and execution are not implemented, and this is not a production release.
+Session 3 adds offline comparison and reviewable migration plans to the schema validator and PostgreSQL 16/17 inspector. Plans support explicit column renames and limited additive changes; unsafe proposals are blocked without partial SQL. Live validation of the generated SQL is in progress. Migration execution is not implemented, and this is not a production release.
 
 ## Try the foundation
 
@@ -17,7 +17,16 @@ go build -o bin/forgeschema ./cmd/forgeschema
 ./bin/forgeschema inspect public
 ```
 
-Validation prints canonical JSON on success and errors to stderr on failure. Exit codes are 0 for success, 1 for invalid input or file errors, and 2 for command usage errors. See SCHEMA.md for the exact supported contract. The version is 0.0.2-dev; no release binaries are published.
+Validation prints canonical JSON on success and errors to stderr on failure. Exit codes are 0 for success, 1 for invalid input or file errors, and 2 for command usage errors. See SCHEMA.md for the exact supported contract. The version is 0.0.3-dev; no release binaries are published.
+
+## Review a migration plan
+
+```sh
+./bin/forgeschema plan examples/customers.yaml examples/customers-next.yaml examples/customer-renames.yaml
+./bin/forgeschema plan --explain examples/customers.yaml examples/customers-next.yaml examples/customer-renames.yaml
+```
+
+The default output is a versioned JSON artifact; --explain prints a human review. Inspection JSON can also be used as the source schema. A blocked plan exits 3, includes reasons and contains no operations. These commands never execute SQL. See PLANNING.md for the artifact format, supported operations and limits.
 
 ## PostgreSQL fixture
 

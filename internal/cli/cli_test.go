@@ -51,3 +51,33 @@ func TestInspectionConfiguration(t *testing.T) {
 		t.Fatalf("invalid scope accepted: %d %s", got, errs.String())
 	}
 }
+
+func TestPlanCommands(t *testing.T) {
+	cases := []struct {
+		args []string
+		code int
+		has  string
+	}{
+		{[]string{"plan"}, 2, ""},
+		{[]string{"plan", "../../examples/customers.yaml", "../../examples/customers.yaml"}, 0, `"operations": []`},
+		{[]string{"plan", "../../examples/customers.yaml", "../../examples/customers-next.yaml", "../../examples/customer-renames.yaml"}, 0, `"rename_column"`},
+		{[]string{"plan", "--explain", "../../examples/customers.yaml", "../../examples/customers-next.yaml", "../../examples/customer-renames.yaml"}, 0, `RENAME COLUMN`},
+		{[]string{"plan", "../../examples/customers.yaml", "../../examples/customers-next.yaml"}, 3, `"status": "blocked"`},
+		{[]string{"plan", "missing.yaml", "../../examples/customers.yaml"}, 1, ""},
+	}
+	for _, c := range cases {
+		var out, errs bytes.Buffer
+		got := Run(c.args, &out, &errs)
+		if got != c.code {
+			t.Fatalf("%v: %d %s", c.args, got, errs.String())
+		}
+		if c.has != "" && !strings.Contains(out.String(), c.has) {
+			t.Fatalf("missing %s in %s", c.has, out.String())
+		}
+		if c.code == 1 || c.code == 2 {
+			if out.Len() != 0 {
+				t.Fatal("invalid input produced artifact")
+			}
+		}
+	}
+}

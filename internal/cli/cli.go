@@ -9,20 +9,23 @@ import (
 	"os"
 	"time"
 
+	"github.com/ForgeSchema/forgeschema/plan"
 	"github.com/ForgeSchema/forgeschema/postgres"
 	"github.com/ForgeSchema/forgeschema/schema"
 )
 
-const Version = "0.0.2-dev"
+const Version = "0.0.3-dev"
 const usage = `ForgeSchema — PostgreSQL schema evolution prototype
 Usage:
   forgeschema version
   forgeschema validate SCHEMA.yaml
   forgeschema inspect SCHEMA_NAME
+  forgeschema plan [--explain] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]
   forgeschema help
 
 Inspection uses DATABASE_URL and reads catalog metadata only, with a 30-second
-timeout. PostgreSQL 16 and 17 are supported. Plan, apply and verify are pending.
+timeout. PostgreSQL 16 and 17 are supported. Planning is offline and does not
+execute SQL. A blocked plan exits 3. Apply and verify are pending.
 `
 
 func Run(args []string, out, errs io.Writer) int {
@@ -42,6 +45,57 @@ func Run(args []string, out, errs io.Writer) int {
 			return fail(errs, "version takes no arguments", 2)
 		}
 		fmt.Fprintln(out, Version)
+		return 0
+	case "plan":
+		inputs := args[1:]
+		explain := false
+		if len(inputs) > 0 && inputs[0] == "--explain" {
+			explain = true
+			inputs = inputs[1:]
+		}
+		if len(inputs) < 2 || len(inputs) > 3 {
+			return fail(errs, "usage: forgeschema plan [--explain] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]", 2)
+		}
+		src, err := loadSchema(inputs[0])
+		if err != nil {
+			return fail(errs, err.Error(), 1)
+		}
+		dst, err := loadSchema(inputs[1])
+		if err != nil {
+			return fail(errs, err.Error(), 1)
+		}
+		renames := []plan.Rename{}
+		if len(inputs) == 3 {
+			f, err := os.Open(inputs[2])
+			if err != nil {
+				return fail(errs, err.Error(), 1)
+			}
+			renames, err = plan.LoadRenames(f)
+			f.Close()
+			if err != nil {
+				return fail(errs, err.Error(), 1)
+			}
+		}
+		p, err := plan.Build(src, dst, renames)
+		if err != nil {
+			return fail(errs, err.Error(), 1)
+		}
+		if explain {
+			summary, err := p.Summary()
+			if err != nil {
+				return fail(errs, err.Error(), 1)
+			}
+			fmt.Fprint(out, summary)
+		} else {
+			b, err := p.JSON()
+			if err != nil {
+				return fail(errs, err.Error(), 1)
+			}
+			fmt.Fprintln(out, string(b))
+		}
+		if p.Status == "blocked" {
+			return 3
+		}
 		return 0
 	case "inspect":
 		if len(args) != 2 {
@@ -101,4 +155,17 @@ func Run(args []string, out, errs io.Writer) int {
 func fail(w io.Writer, message string, code int) int {
 	fmt.Fprintln(w, "forgeschema:", message)
 	return code
+}
+
+func loadSchema(path string) (schema.Document, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return schema.Document{}, err
+	}
+	defer f.Close()
+	d, err := schema.Load(f)
+	if err != nil {
+		return d, fmt.Errorf("%s: %w", path, err)
+	}
+	return d, nil
 }

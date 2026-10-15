@@ -1,0 +1,21 @@
+version: 1
+schema: public
+tables:
+  - name: customers
+    columns:
+      - name: id
+        type: bigint
+      - name: full_name
+        type: text
+      - name: email
+        type: text
+        nullable: true
+      - name: notes
+        type: text
+        nullable: true
+    primary_key: [id]
+    indexes:
+      - name: customers_email_idx
+        columns: [email]
+      - name: customers_notes_idx
+        columns: [notes]

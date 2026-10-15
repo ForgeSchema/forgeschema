@@ -1,0 +1,5 @@
+version: 1
+columns:
+  - table: customers
+    from: customer_name
+    to: full_name
