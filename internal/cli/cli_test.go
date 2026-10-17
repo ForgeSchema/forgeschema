@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"github.com/lib/pq"
 	"os"
 	"path/filepath"
 	"strings"
@@ -87,7 +88,11 @@ func TestApplyInputErrors(t *testing.T) {
 	for _, c := range []struct {
 		args []string
 		want int
-	}{{[]string{"apply"}, 2}, {[]string{"apply", "missing.json"}, 1}, {[]string{"apply", "../../examples/customer-plan.json"}, 2}} {
+	}{{[]string{"apply"}, 2}, {[]string{"apply", "missing.json"}, 1}, {[]string{"apply", "../../examples/customer-plan.json"}, 2},
+		{[]string{"apply", "--timeout", "soon", "../../examples/customer-plan.json"}, 2},
+		{[]string{"apply", "--lock-timeout", "1s"}, 2},
+		{[]string{"apply", "--statement-timeout", "-1s", "../../examples/customer-plan.json"}, 2},
+		{[]string{"apply", "../../examples/customer-plan.json", "extra"}, 2}} {
 		var out, errs bytes.Buffer
 		if got := Run(c.args, &out, &errs); got != c.want || out.Len() != 0 {
 			t.Fatalf("%v: %d %s", c.args, got, errs.String())
@@ -116,5 +121,17 @@ func TestVerifyInputErrors(t *testing.T) {
 	var out, errs bytes.Buffer
 	if got := Run([]string{"verify", "../../examples/customers.yaml"}, &out, &errs); got != 1 || strings.Contains(errs.String(), "secret-never-log") || out.Len() != 0 {
 		t.Fatalf("unsafe verification error %d %s", got, errs.String())
+	}
+}
+
+func TestDetailOmitsRowDataAndConnectionIdentity(t *testing.T) {
+	dup := &pq.Error{Code: "23505", Message: `could not create unique index "u"`, Detail: "Key (email)=(alice@example.com) is duplicated."}
+	if got := detail(dup); !strings.Contains(got, "23505") || strings.Contains(got, "alice") {
+		t.Fatalf("duplicate detail: %q", got)
+	}
+	for _, code := range []pq.ErrorCode{"28000", "28P01", "3D000", "08006"} {
+		if got := detail(&pq.Error{Code: code, Message: `role "someone" does not exist`}); got != "" {
+			t.Errorf("%s leaked %q", code, got)
+		}
 	}
 }

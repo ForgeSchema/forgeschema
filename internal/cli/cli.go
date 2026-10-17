@@ -5,10 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"time"
+
+	"github.com/lib/pq"
 
 	"github.com/ForgeSchema/forgeschema/plan"
 	"github.com/ForgeSchema/forgeschema/postgres"
@@ -22,7 +25,7 @@ Usage:
   forgeschema validate SCHEMA.yaml
   forgeschema inspect SCHEMA_NAME
   forgeschema plan [--explain] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]
-  forgeschema apply PLAN.json
+  forgeschema apply [--lock-timeout 5s] [--statement-timeout 30s] [--timeout 60s] PLAN.json
   forgeschema verify EXPECTED.yaml
   forgeschema verify --plan PLAN.json
   forgeschema help
@@ -30,7 +33,9 @@ Usage:
 Inspection uses DATABASE_URL and reads catalog metadata only, with a 30-second
 timeout. PostgreSQL 16 and 17 are supported. Planning is offline and does not
 execute SQL. A blocked plan exits 3. Apply executes an exact reviewed artifact;
-pause external DDL first. Verify is read-only and exits 4 on structural drift.
+pause external DDL first. It exits 5 when the database no longer matches the
+plan and 6 when the commit outcome is unknown. Verify is read-only and exits 4
+on structural drift.
 `
 
 func Run(args []string, out, errs io.Writer) int {
@@ -93,7 +98,7 @@ func Run(args []string, out, errs io.Writer) int {
 			if errors.As(err, &unsupported) {
 				return fail(errs, unsupported.Error(), 1)
 			}
-			return fail(errs, "database verification failed; check connection, permissions, server version and timeout", 1)
+			return fail(errs, "database verification failed"+detail(err)+"; check connection, permissions, server version and timeout", 1)
 		}
 		b, err := json.Marshal(result)
 		if err != nil {
@@ -105,9 +110,20 @@ func Run(args []string, out, errs io.Writer) int {
 		}
 		return 0
 	case "apply":
-		if len(args) != 2 {
-			return fail(errs, "usage: forgeschema apply PLAN.json (set DATABASE_URL; pause external DDL)", 2)
+		flags := flag.NewFlagSet("apply", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		var opts postgres.ApplyOptions
+		flags.DurationVar(&opts.LockTimeout, "lock-timeout", 5*time.Second, "")
+		flags.DurationVar(&opts.StatementTimeout, "statement-timeout", 30*time.Second, "")
+		flags.DurationVar(&opts.Timeout, "timeout", 60*time.Second, "")
+		applyUsage := "usage: forgeschema apply [--lock-timeout 5s] [--statement-timeout 30s] [--timeout 60s] PLAN.json (set DATABASE_URL; pause external DDL)"
+		if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 1 {
+			return fail(errs, applyUsage, 2)
 		}
+		if opts.LockTimeout < time.Millisecond || opts.StatementTimeout < time.Millisecond || opts.Timeout < time.Millisecond {
+			return fail(errs, "timeouts must be at least 1ms, for example 30s or 5m", 2)
+		}
+		args = []string{"apply", flags.Arg(0)}
 		f, err := os.Open(args[1])
 		if err != nil {
 			return fail(errs, err.Error(), 1)
@@ -129,19 +145,27 @@ func Run(args []string, out, errs io.Writer) int {
 			return fail(errs, "invalid database connection configuration", 1)
 		}
 		defer db.Close()
-		result, err := postgres.Apply(context.Background(), db, p, postgres.ApplyOptions{})
+		result, err := postgres.Apply(context.Background(), db, p, opts)
 		if err != nil {
 			var commit *postgres.CommitError
 			if errors.As(err, &commit) {
-				return fail(errs, commit.Error()+"; plan_id="+commit.PlanID+" migration_id="+commit.MigrationID, 1)
+				return fail(errs, commit.Error()+"; plan_id="+commit.PlanID+" migration_id="+commit.MigrationID, 6)
 			}
 			var drift *postgres.DriftError
 			if errors.As(err, &drift) {
-				return fail(errs, drift.Error(), 1)
+				if drift.Phase == "target" {
+					return fail(errs, drift.Error()+"; the result did not match the reviewed target, so nothing was committed. Check for concurrent DDL, then inspect again", 5)
+				}
+				return fail(errs, drift.Error()+"; the database no longer matches this plan, so inspect it again and build a new plan", 5)
 			}
 			var stage *postgres.ApplyError
 			if errors.As(err, &stage) {
-				return fail(errs, "migration failed during "+stage.Stage+"; transaction was not committed", 1)
+				// The connection could not be opened: keep that message
+				// generic, since driver errors there can echo connection details.
+				if stage.Stage == "begin" {
+					return fail(errs, "could not start the migration transaction; check DATABASE_URL, network and permissions", 1)
+				}
+				return fail(errs, "migration failed during "+stage.Stage+detail(err)+"; transaction was not committed", 1)
 			}
 			return fail(errs, "could not apply reviewed migration plan", 1)
 		}
@@ -226,7 +250,7 @@ func Run(args []string, out, errs io.Writer) int {
 			if errors.As(err, &unsupported) {
 				return fail(errs, unsupported.Error(), 1)
 			}
-			return fail(errs, "database inspection failed; check connection, permissions, server version and timeout", 1)
+			return fail(errs, "database inspection failed"+detail(err)+"; check connection, permissions, server version and timeout", 1)
 		}
 		b, err := d.CanonicalJSON()
 		if err != nil {
@@ -256,6 +280,29 @@ func Run(args []string, out, errs io.Writer) int {
 	default:
 		return fail(errs, fmt.Sprintf("unknown command %q; use help", args[0]), 2)
 	}
+}
+
+// detail returns the server's error message and SQLSTATE, or a plain
+// timeout/cancellation note. It leaves out the error's Detail field, which can
+// quote row values such as a duplicated key, and stays silent for connection,
+// authentication and missing-database errors (SQLSTATE classes 08, 28, 3D),
+// whose messages can name the user or database from DATABASE_URL.
+func detail(err error) string {
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		switch pqErr.Code.Class() {
+		case "08", "28", "3D":
+			return ""
+		}
+		return ": " + pqErr.Message + " [SQLSTATE " + string(pqErr.Code) + "]"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return ": timed out"
+	}
+	if errors.Is(err, context.Canceled) {
+		return ": canceled"
+	}
+	return ""
 }
 func fail(w io.Writer, message string, code int) int {
 	fmt.Fprintln(w, "forgeschema:", message)

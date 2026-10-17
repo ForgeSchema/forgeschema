@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ForgeSchema/forgeschema/schema"
 	_ "github.com/lib/pq"
@@ -49,7 +50,9 @@ func Inspect(ctx context.Context, db *sql.DB, name string) (schema.Document, err
 func inspectTx(ctx context.Context, tx *sql.Tx, name string) (schema.Document, error) {
 	empty := schema.Document{}
 	// Qualify every object and prevent user objects shadowing catalog functions.
-	if _, err := tx.ExecContext(ctx, "SET LOCAL search_path = pg_catalog"); err != nil {
+	// Standard strings keep backslashes literal in pg_get_expr output, whatever
+	// the role, database or connection sets.
+	if _, err := tx.ExecContext(ctx, "SET LOCAL search_path = pg_catalog; SET LOCAL standard_conforming_strings = on"); err != nil {
 		return empty, err
 	}
 	var err error
@@ -84,7 +87,10 @@ func inspectTx(ctx context.Context, tx *sql.Tx, name string) (schema.Document, e
 func checkScope(ctx context.Context, tx *sql.Tx, oid int64, name string) error {
 	// These objects would otherwise be invisible in a table-only snapshot.
 	checks := []struct{ query, feature string }{
-		{`SELECT relname FROM pg_catalog.pg_class WHERE relnamespace=$1 AND relkind NOT IN ('r','i') ORDER BY relname LIMIT 1`, "views, sequences, foreign and partitioned relations are not represented"},
+		{`SELECT c.relname FROM pg_catalog.pg_class c WHERE c.relnamespace=$1 AND c.relkind NOT IN ('r','i')
+ AND NOT (c.relkind='S' AND EXISTS(SELECT 1 FROM pg_catalog.pg_depend d WHERE d.classid='pg_catalog.pg_class'::regclass
+ AND d.objid=c.oid AND d.refclassid='pg_catalog.pg_class'::regclass AND d.deptype='i'))
+ ORDER BY c.relname LIMIT 1`, "views, standalone or serial sequences, foreign and partitioned relations are not represented"},
 		{`SELECT typname FROM pg_catalog.pg_type WHERE typnamespace=$1 AND typtype<>'c' AND typelem=0 ORDER BY typname LIMIT 1`, "custom types and domains are not represented"},
 		{`SELECT p.proname FROM pg_catalog.pg_proc p WHERE p.pronamespace=$1 ORDER BY p.proname LIMIT 1`, "functions and procedures are not represented"},
 		{`SELECT collname FROM pg_catalog.pg_collation WHERE collnamespace=$1 ORDER BY collname LIMIT 1`, "custom collations are not represented"},
@@ -145,10 +151,10 @@ func readTables(ctx context.Context, tx *sql.Tx, oid int64, name string) (schema
 			return doc, unsupported(object, "nonstandard table storage, inheritance, partitioning, policies, rules or triggers")
 		}
 		table := schema.Table{Name: info.name}
-		if table.Columns, err = readColumns(ctx, tx, info.oid, object); err != nil {
+		if table.Columns, err = readColumns(ctx, tx, oid, info.oid, object, info.name); err != nil {
 			return doc, err
 		}
-		if table.PrimaryKey, err = readConstraints(ctx, tx, info.oid, object, info.name); err != nil {
+		if table.PrimaryKey, table.Unique, table.ForeignKeys, err = readConstraints(ctx, tx, oid, info.oid, object, info.name); err != nil {
 			return doc, err
 		}
 		if table.Indexes, err = readIndexes(ctx, tx, info.oid, object); err != nil {
@@ -158,14 +164,28 @@ func readTables(ctx context.Context, tx *sql.Tx, oid int64, name string) (schema
 	}
 	return doc, nil
 }
-func readColumns(ctx context.Context, tx *sql.Tx, oid int64, object string) ([]schema.Column, error) {
+func readColumns(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, table string) ([]schema.Column, error) {
+	// Defaults are rendered with relation 0: they cannot reference columns, and
+	// passing the table would make pg_get_expr lock it, so inspection would
+	// wait behind any session holding an exclusive lock on an unrelated table.
+	// An identity column is accepted only with PostgreSQL's default sequence:
+	// the deterministic TABLE_COLUMN_seq name in the same schema and default
+	// start, increment, bounds, cache and cycle settings.
 	rows, err := tx.QueryContext(ctx, `SELECT a.attname,pg_catalog.format_type(a.atttypid,a.atttypmod),NOT a.attnotnull,
- a.atthasdef OR a.attidentity<>'' OR a.attgenerated<>'' OR a.attcollation<>t.typcollation
+ COALESCE(CASE WHEN a.attgenerated='' THEN pg_catalog.pg_get_expr(ad.adbin,0) END,''),a.attidentity::text,
+ a.attidentity='' OR EXISTS(SELECT 1 FROM pg_catalog.pg_depend d JOIN pg_catalog.pg_class s ON s.oid=d.objid
+  JOIN pg_catalog.pg_sequence q ON q.seqrelid=s.oid
+  WHERE d.classid='pg_catalog.pg_class'::regclass AND d.refclassid='pg_catalog.pg_class'::regclass AND d.refobjid=a.attrelid
+  AND d.refobjsubid=a.attnum AND d.deptype='i' AND s.relnamespace=$2 AND s.relname=$3||'_'||a.attname||'_seq'
+  AND s.relpersistence='p' AND q.seqtypid=a.atttypid AND q.seqstart=1 AND q.seqincrement=1 AND q.seqmin=1 AND q.seqcache=1 AND NOT q.seqcycle
+  AND q.seqmax=CASE a.atttypid WHEN 'pg_catalog.int2'::regtype THEN 32767 WHEN 'pg_catalog.int4'::regtype THEN 2147483647 ELSE 9223372036854775807 END),
+ a.attgenerated<>'' OR a.attcollation<>t.typcollation
  OR a.attstorage<>t.typstorage OR a.attcompression<>'' OR a.attoptions IS NOT NULL
  OR a.attfdwoptions IS NOT NULL OR tn.nspname<>'pg_catalog' OR t.typtype<>'b' OR t.typelem<>0
  FROM pg_catalog.pg_attribute a JOIN pg_catalog.pg_type t ON t.oid=a.atttypid
  JOIN pg_catalog.pg_namespace tn ON tn.oid=t.typnamespace
- WHERE a.attrelid=$1 AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum`, oid)
+ LEFT JOIN pg_catalog.pg_attrdef ad ON ad.adrelid=a.attrelid AND ad.adnum=a.attnum
+ WHERE a.attrelid=$1 AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum`, oid, nsoid, table)
 	if err != nil {
 		return nil, err
 	}
@@ -173,45 +193,106 @@ func readColumns(ctx context.Context, tx *sql.Tx, oid int64, object string) ([]s
 	var cols []schema.Column
 	for rows.Next() {
 		var c schema.Column
-		var special bool
-		if err = rows.Scan(&c.Name, &c.Type, &c.Nullable, &special); err != nil {
+		var expr, identity string
+		var identityOK, special bool
+		if err = rows.Scan(&c.Name, &c.Type, &c.Nullable, &expr, &identity, &identityOK, &special); err != nil {
 			return nil, err
 		}
 		if special {
-			return nil, unsupported(object+"."+c.Name, "defaults, identity/generated columns, custom types, collations or storage options")
+			return nil, unsupported(object+"."+c.Name, "generated columns, custom types, collations or storage options")
+		}
+		switch identity {
+		case "a":
+			c.Identity = "always"
+		case "d":
+			c.Identity = "by_default"
+		}
+		if !identityOK {
+			return nil, unsupported(object+"."+c.Name, "identity columns need the default TABLE_COLUMN_seq sequence with default options")
+		}
+		if expr != "" {
+			typ, ok := schema.NormalizeType(c.Type)
+			d, supported := schema.DefaultFromCatalog(typ, expr)
+			if !ok || !supported {
+				feature := "default " + expr + " is outside the supported literal/function defaults"
+				if strings.HasPrefix(expr, "nextval(") {
+					feature += "; serial columns are unsupported, use identity"
+				}
+				return nil, unsupported(object+"."+c.Name, feature)
+			}
+			c.Default = d
 		}
 		cols = append(cols, c)
 	}
 	return cols, rows.Err()
 }
-func readConstraints(ctx context.Context, tx *sql.Tx, oid int64, object, table string) ([]string, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT c.conname,c.contype::text,c.condeferrable OR c.condeferred OR NOT c.convalidated OR NOT c.conislocal OR c.coninhcount<>0,
+
+var actionCodes = map[string]string{"a": "", "r": "restrict", "c": "cascade", "n": "set_null", "d": "set_default"}
+
+func readConstraints(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, table string) ([]string, []schema.Unique, []schema.ForeignKey, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT c.conname,c.contype::text,
+ c.condeferrable OR c.condeferred OR NOT c.convalidated OR NOT c.conislocal OR c.coninhcount<>0
+ OR (c.contype='f' AND (c.confmatchtype<>'s' OR c.confdelsetcols IS NOT NULL OR r.relnamespace<>$2)),
  COALESCE((SELECT json_agg(a.attname ORDER BY k.n)::text FROM unnest(c.conkey) WITH ORDINALITY k(attnum,n)
- JOIN pg_catalog.pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum),'[]')
- FROM pg_catalog.pg_constraint c WHERE c.conrelid=$1 ORDER BY c.conname`, oid)
+ JOIN pg_catalog.pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum),'[]'),
+ COALESCE(r.relname::text,''),
+ COALESCE((SELECT json_agg(a.attname ORDER BY k.n)::text FROM unnest(c.confkey) WITH ORDINALITY k(attnum,n)
+ JOIN pg_catalog.pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.attnum),'[]'),
+ c.confdeltype::text,c.confupdtype::text
+ FROM pg_catalog.pg_constraint c LEFT JOIN pg_catalog.pg_class r ON r.oid=c.confrelid
+ WHERE c.conrelid=$1 ORDER BY c.conname`, oid, nsoid)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	defer rows.Close()
 	var pk []string
+	var uniques []schema.Unique
+	var fks []schema.ForeignKey
 	for rows.Next() {
-		var cname, kind, columns string
+		var cname, kind, cols, refTable, refCols, onDelete, onUpdate string
 		var special bool
-		if err = rows.Scan(&cname, &kind, &special, &columns); err != nil {
-			return nil, err
+		if err = rows.Scan(&cname, &kind, &special, &cols, &refTable, &refCols, &onDelete, &onUpdate); err != nil {
+			return nil, nil, nil, err
 		}
-		if kind != "p" || special || cname != table+"_pkey" {
-			return nil, unsupported(object+" constraint "+cname, "only a nondeferrable TABLE_pkey primary key is represented")
+		label := object + " constraint " + cname
+		if special {
+			return nil, nil, nil, unsupported(label, "deferrable, unvalidated, inherited, cross-schema, MATCH FULL or column-list SET NULL constraints are not represented")
 		}
-		if err = json.Unmarshal([]byte(columns), &pk); err != nil {
-			return nil, err
+		var names []string
+		if err = json.Unmarshal([]byte(cols), &names); err != nil {
+			return nil, nil, nil, err
+		}
+		switch kind {
+		case "p":
+			if cname != table+"_pkey" {
+				return nil, nil, nil, unsupported(label, "primary keys must use the TABLE_pkey name")
+			}
+			pk = names
+		case "u":
+			uniques = append(uniques, schema.Unique{Name: cname, Columns: names})
+		case "f":
+			fk := schema.ForeignKey{Name: cname, Columns: names, References: schema.Reference{Table: refTable}}
+			if err = json.Unmarshal([]byte(refCols), &fk.References.Columns); err != nil {
+				return nil, nil, nil, err
+			}
+			var ok1, ok2 bool
+			fk.OnDelete, ok1 = actionCodes[onDelete]
+			fk.OnUpdate, ok2 = actionCodes[onUpdate]
+			if !ok1 || !ok2 {
+				return nil, nil, nil, unsupported(label, "unknown referential action")
+			}
+			fks = append(fks, fk)
+		default:
+			return nil, nil, nil, unsupported(label, "check, exclusion and trigger constraints are not represented")
 		}
 	}
-	return pk, rows.Err()
+	return pk, uniques, fks, rows.Err()
 }
 func readIndexes(ctx context.Context, tx *sql.Tx, oid int64, object string) ([]schema.Index, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT ic.relname,i.indisprimary,
- am.amname<>'btree' OR (i.indisunique AND NOT i.indisprimary) OR i.indisexclusion
+	rows, err := tx.QueryContext(ctx, `SELECT ic.relname,
+ i.indisprimary OR EXISTS(SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conindid=i.indexrelid AND c.conrelid=i.indrelid AND c.contype IN ('p','u')),
+ i.indisunique,
+ am.amname<>'btree' OR i.indisexclusion
  OR NOT i.indisvalid OR NOT i.indisready OR NOT i.indislive OR NOT i.indimmediate
  OR i.indnullsnotdistinct OR i.indisclustered OR i.indisreplident
  OR i.indexprs IS NOT NULL OR i.indpred IS NOT NULL OR i.indnatts<>i.indnkeyatts
@@ -233,15 +314,16 @@ func readIndexes(ctx context.Context, tx *sql.Tx, oid int64, object string) ([]s
 	var indexes []schema.Index
 	for rows.Next() {
 		var idx schema.Index
-		var primary, special bool
+		var constraint, special bool
 		var columns string
-		if err = rows.Scan(&idx.Name, &primary, &special, &columns); err != nil {
+		if err = rows.Scan(&idx.Name, &constraint, &idx.Unique, &special, &columns); err != nil {
 			return nil, err
 		}
 		if special {
 			return nil, unsupported(object+" index "+idx.Name, "only valid ordinary default-order btree indexes without options are represented")
 		}
-		if primary {
+		// Primary key and unique constraint indexes are described by their constraints.
+		if constraint {
 			continue
 		}
 		if err = json.Unmarshal([]byte(columns), &idx.Columns); err != nil {

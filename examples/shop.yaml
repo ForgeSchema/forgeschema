@@ -1,0 +1,76 @@
+version: 1
+schema: public
+tables:
+- name: customers
+  columns:
+  - name: id
+    type: bigint
+    identity: always
+  - name: email
+    type: varchar(320)
+  - name: display_name
+    type: text
+    nullable: true
+  - name: status
+    type: varchar(20)
+    default: "'active'"
+  - name: created_at
+    type: timestamptz
+    default: now()
+  primary_key: [id]
+  unique:
+  - name: customers_email_key
+    columns: [email]
+- name: orders
+  columns:
+  - name: id
+    type: uuid
+    default: gen_random_uuid()
+  - name: customer_id
+    type: bigint
+  - name: total
+    type: numeric(12,2)
+    default: "0"
+  - name: paid
+    type: boolean
+    default: "false"
+  - name: placed_on
+    type: date
+    default: current_date
+  - name: metadata
+    type: jsonb
+    default: "'{}'"
+  primary_key: [id]
+  indexes:
+  - name: orders_customer_idx
+    columns: [customer_id, placed_on]
+  foreign_keys:
+  - name: orders_customer_fkey
+    columns: [customer_id]
+    references:
+      table: customers
+      columns: [id]
+    on_delete: restrict
+- name: order_lines
+  columns:
+  - name: order_id
+    type: uuid
+  - name: line_no
+    type: smallint
+  - name: sku
+    type: char(12)
+  - name: quantity
+    type: integer
+    default: "1"
+  primary_key: [order_id, line_no]
+  indexes:
+  - name: order_lines_sku_idx
+    columns: [sku, order_id]
+    unique: true
+  foreign_keys:
+  - name: order_lines_order_fkey
+    columns: [order_id]
+    references:
+      table: orders
+      columns: [id]
+    on_delete: cascade

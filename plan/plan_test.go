@@ -125,8 +125,10 @@ func TestBlockedChangesHaveNoSQL(t *testing.T) {
 		"required-column": func(d *schema.Document) {
 			d.Tables[0].Columns = append(d.Tables[0].Columns, schema.Column{Name: "required", Type: "text"})
 		},
-		"type-change":     func(d *schema.Document) { d.Tables[0].Columns[0].Type = "integer" },
-		"nullability":     func(d *schema.Document) { d.Tables[0].Columns[0].Nullable = true },
+		"type-change": func(d *schema.Document) { d.Tables[0].Columns[0].Type = "integer" },
+		"identity-add": func(d *schema.Document) {
+			d.Tables[0].Columns = append(d.Tables[0].Columns, schema.Column{Name: "seq", Type: "bigint", Identity: "always"})
+		},
 		"pk-change":       func(d *schema.Document) { d.Tables[0].PrimaryKey = nil },
 		"index-drop":      func(d *schema.Document) { d.Tables[0].Indexes = nil },
 		"index-change":    func(d *schema.Document) { d.Tables[0].Indexes[0].Columns = []string{"id"} },

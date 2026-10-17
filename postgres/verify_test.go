@@ -46,7 +46,7 @@ func TestVerifyReadOnlyRoleAndDrift(t *testing.T) {
 func TestVerifyUnsupportedAndCancelled(t *testing.T) {
 	db := database(t)
 	name, p := applyFixture(t, db)
-	exec(t, db, "ALTER TABLE "+name+".customers ALTER COLUMN email SET DEFAULT 'unsupported'")
+	exec(t, db, "ALTER TABLE "+name+".customers ALTER COLUMN email SET DEFAULT lower('UNSUPPORTED')")
 	result, err := postgres.Verify(context.Background(), db, p.Source)
 	var unsupported *postgres.UnsupportedError
 	if !errors.As(err, &unsupported) || result.Status != "" {

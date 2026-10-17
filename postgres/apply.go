@@ -19,7 +19,9 @@ import (
 const coordinationKey int64 = 5066357439090741581
 const historySchema = "forgeschema_meta"
 
-type ApplyOptions struct{ LockTimeout, StatementTimeout time.Duration }
+// ApplyOptions bounds waiting. Zero values select the defaults: 5s lock
+// timeout, 30s statement timeout and a 60s overall deadline.
+type ApplyOptions struct{ LockTimeout, StatementTimeout, Timeout time.Duration }
 type ApplyResult struct {
 	Status            string `json:"status"`
 	PlanID            string `json:"plan_id"`
@@ -77,7 +79,7 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 	if db == nil {
 		return empty, fmt.Errorf("database is required")
 	}
-	if opts.LockTimeout < 0 || opts.StatementTimeout < 0 {
+	if opts.LockTimeout < 0 || opts.StatementTimeout < 0 || opts.Timeout < 0 {
 		return empty, fmt.Errorf("timeouts must be positive or zero for defaults")
 	}
 	if opts.LockTimeout == 0 {
@@ -86,10 +88,13 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 	if opts.StatementTimeout == 0 {
 		opts.StatementTimeout = 30 * time.Second
 	}
-	if opts.LockTimeout < time.Millisecond || opts.StatementTimeout < time.Millisecond {
+	if opts.Timeout == 0 {
+		opts.Timeout = 60 * time.Second
+	}
+	if opts.LockTimeout < time.Millisecond || opts.StatementTimeout < time.Millisecond || opts.Timeout < time.Millisecond {
 		return empty, fmt.Errorf("timeouts must be at least one millisecond")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 	id, err := p.ID()
 	if err != nil {
@@ -102,7 +107,7 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 	}
 	defer tx.Rollback()
 	fail := func(stage string, err error) (ApplyResult, error) { return empty, &ApplyError{stage, err} }
-	for _, s := range []struct{ name, value string }{{"search_path", "pg_catalog"}, {"application_name", "forgeschema-apply"}, {"lock_timeout", fmt.Sprintf("%dms", opts.LockTimeout.Milliseconds())}, {"statement_timeout", fmt.Sprintf("%dms", opts.StatementTimeout.Milliseconds())}} {
+	for _, s := range []struct{ name, value string }{{"search_path", "pg_catalog"}, {"application_name", "forgeschema-apply"}, {"standard_conforming_strings", "on"}, {"lock_timeout", fmt.Sprintf("%dms", opts.LockTimeout.Milliseconds())}, {"statement_timeout", fmt.Sprintf("%dms", opts.StatementTimeout.Milliseconds())}} {
 		if _, err = tx.ExecContext(ctx, "SELECT pg_catalog.set_config($1,$2,true)", s.name, s.value); err != nil {
 			return fail("configuration", err)
 		}
@@ -110,11 +115,20 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 	if _, err = tx.ExecContext(ctx, "SELECT pg_catalog.pg_advisory_xact_lock($1)", coordinationKey); err != nil {
 		return fail("coordination lock", err)
 	}
-	// Hold locks until commit. READ COMMITTED ensures the subsequent catalog
-	// reads are fresh even if acquiring one of these locks had to wait.
-	for _, table := range p.Source.Tables {
-		if _, err = tx.ExecContext(ctx, "LOCK TABLE ONLY "+qualified(p.Source.Schema, table.Name)+" IN ACCESS EXCLUSIVE MODE"); err != nil {
-			return fail("relation locks", err)
+	// Lock only the existing tables the plan changes, plus SHARE ROW EXCLUSIVE
+	// on tables referenced by new foreign keys, and hold the locks until
+	// commit. Unchanged tables stay readable and writable; structural drift
+	// anywhere in the schema is still caught by the fingerprint check below.
+	// READ COMMITTED keeps catalog reads fresh after any lock wait.
+	exclusive, referenced := p.LockedTables()
+	for _, l := range []struct {
+		tables []string
+		mode   string
+	}{{exclusive, "ACCESS EXCLUSIVE"}, {referenced, "SHARE ROW EXCLUSIVE"}} {
+		for _, table := range l.tables {
+			if _, err = tx.ExecContext(ctx, "LOCK TABLE ONLY "+qualified(p.Source.Schema, table)+" IN "+l.mode+" MODE"); err != nil {
+				return fail("relation locks", err)
+			}
 		}
 	}
 	live, err := inspectTx(ctx, tx, p.Source.Schema)

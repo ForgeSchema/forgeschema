@@ -373,10 +373,10 @@ func execute(ctx context.Context, o options, dsn string, out io.Writer) (err err
 	if err = db.QueryRowContext(ctx, "SELECT count(*) FROM "+r.Schema+".customers WHERE notes IS NULL").Scan(&nullNotes); err != nil || nullNotes != 2 {
 		return fmt.Errorf("nullable addition did not preserve NULL for existing rows")
 	}
-	if _, err = cli(1, "replay-error.txt", "apply", planPath); err != nil {
+	if _, err = cli(5, "replay-error.txt", "apply", planPath); err != nil {
 		return err
 	}
-	r.ReplayExit = 1
+	r.ReplayExit = 5
 	if _, err = db.ExecContext(ctx, "ALTER TABLE "+r.Schema+".customers ADD COLUMN external_note text"); err != nil {
 		return err
 	}
