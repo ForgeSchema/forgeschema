@@ -2,26 +2,30 @@
 
 ForgeSchema is a PostgreSQL schema evolution engine written in Go. The workflow is inspect, plan, apply and verify, with an explained migration artifact between comparison and execution.
 
-The six-session prototype is complete. Inspect, plan, apply and independently verify supported PostgreSQL schemas. The reproducible walkthrough runs the compiled CLI against two populated synthetic customers, applies six operations and demonstrates stale-plan rejection and read-only drift detection.
+You describe the schema you want in YAML. ForgeSchema reads the live schema, works out the SQL to get there, and writes it down as a plan you can review. Apply runs that exact plan in one transaction, after checking the database still matches what you reviewed. Verify tells you, read-only, whether a database matches a schema file.
+
+It understands ordinary tables, columns with literal or common function defaults, identity columns, primary keys, unique constraints, unique and plain btree indexes, and foreign keys within one schema. Types cover integers, text, varchar(n), char(n), numeric(p,s), boolean, uuid, dates and timestamps, jsonb, bytea, real and double precision. Anything it can't represent exactly is reported as unsupported rather than silently left out.
 
 Explore the [interactive browser demo](https://forgeschema.com/demo/) to compare recorded schemas, review SQL, inspect preserved rows and switch between match/drift reports. It replays actual CLI evidence; it does not execute database changes. See [BROWSER_DEMO.md](BROWSER_DEMO.md) for its source and publishing instructions.
 
-Start with [WALKTHROUGH.md](WALKTHROUGH.md). See [COMMANDS.md](COMMANDS.md) for commands and exits, and [FEATURES.md](FEATURES.md) for the supported/unsupported matrix. This is an alpha prototype, not a production-readiness claim.
+Start with [WALKTHROUGH.md](WALKTHROUGH.md). See [COMMANDS.md](COMMANDS.md) for commands and exits, and [FEATURES.md](FEATURES.md) for the supported/unsupported matrix. This is alpha software, not a production-readiness claim.
 
-## Try the foundation
+## Try it
 
 Install Go 1.24 or later, then run:
 
 ```sh
 go test ./...
 go build -o bin/forgeschema ./cmd/forgeschema
-./bin/forgeschema validate examples/customers.yaml
+./bin/forgeschema validate examples/shop.yaml
 ./bin/forgeschema version
 # Set DATABASE_URL securely in your environment, then inspect one existing schema:
 ./bin/forgeschema inspect public
 ```
 
-Validation prints canonical JSON on success and errors to stderr on failure. Validation uses exit 0 for success, 1 for invalid input/files, and 2 for usage errors. Blocked plan targets use exit 3; standalone verification uses exit 4 for structural drift. See SCHEMA.md for the exact supported contract. The version is 0.1.0-alpha.1. Download packaged binaries and SHA256SUMS from the [alpha release](https://github.com/ForgeSchema/forgeschema/releases/tag/v0.1.0-alpha.1). Linux, macOS and Windows archives cover amd64 and arm64; see [RELEASING.md](RELEASING.md) for validation and platform limits.
+[examples/shop.yaml](examples/shop.yaml) shows the full contract: identity keys, defaults, a unique constraint, a unique index and foreign keys with referential actions. [examples/customers.yaml](examples/customers.yaml) is the smaller schema used by the walkthrough.
+
+Validation prints canonical JSON on success and errors to stderr on failure. Validation uses exit 0 for success, 1 for invalid input/files, and 2 for usage errors. Blocked plan targets use exit 3; standalone verification uses exit 4 for structural drift; apply uses 5 when the database no longer matches the plan and 6 when a commit outcome is unknown. See SCHEMA.md for the exact supported contract. The released version is 0.1.0-alpha.1. Download packaged binaries and SHA256SUMS from the [alpha release](https://github.com/ForgeSchema/forgeschema/releases/tag/v0.1.0-alpha.1). Linux, macOS and Windows archives cover amd64 and arm64; see [RELEASING.md](RELEASING.md) for validation and platform limits.
 
 ## Review a migration plan
 
@@ -30,7 +34,9 @@ Validation prints canonical JSON on success and errors to stderr on failure. Val
 ./bin/forgeschema plan --explain examples/customers.yaml examples/customers-next.yaml examples/customer-renames.yaml
 ```
 
-The default output is a versioned JSON artifact; --explain prints a human review. Inspection JSON can also be used as the source schema. A blocked plan exits 3, includes reasons and contains no operations. The plan commands never execute SQL. To execute a saved reviewed artifact, use `forgeschema apply PLAN.json` with DATABASE_URL set and external DDL paused. Read APPLY.md for transaction, locking, role and commit-outcome limits. See PLANNING.md for the artifact format, supported operations and limits.
+The default output is a versioned JSON artifact; --explain prints a human review, including which tables apply will lock. Inspection JSON can also be used as the source schema. A blocked plan exits 3, includes reasons and contains no operations. The plan commands never execute SQL.
+
+To execute a saved reviewed artifact, use `forgeschema apply PLAN.json` with DATABASE_URL set and external DDL paused. Apply locks only the tables the plan changes, plus the foreign key partners of a column whose type changes. Slow steps such as building an index on a large table can get more time with `--lock-timeout`, `--statement-timeout` and `--timeout`. When a step fails, the message includes PostgreSQL's own message and SQLSTATE, without row values. Read APPLY.md for transaction, locking, role and commit-outcome limits. See PLANNING.md for the artifact format, supported operations and limits.
 
 ## Verify independently
 
@@ -63,8 +69,13 @@ go test -race -count=1 -v ./postgres
 
 Without that variable, database tests explicitly skip. The GitHub Actions workflow runs them against PostgreSQL 16.10 and 17.6 services. See INSPECTION.md for managed scope, supported objects, ignored metadata and rejection behavior.
 
-## Development checkpoints
+## Not supported yet
 
-Read PLAN.md for the six-session schedule, RESUME.md for current results and continuation instructions, and AGENTS.md for session rules. Every session ends with code and website updates, followed by a pause for the owner's go-ahead. Website content is maintained in photozeitgeist/forgeschema.com. The owner connected https://forgeschema.com/. All six sessions are complete; further work awaits owner direction.
+- check constraints, views, sequences other than identity, partitions, triggers and functions
+- concurrent index builds outside the migration transaction
+- changes that need more than one step: required columns without a default, type conversions other than widening, and drops
+- timestamp precision, arrays and enums
+
+Development notes and the change log live in [docs/dev](docs/dev). The website content is maintained in photozeitgeist/forgeschema.com.
 
 Copyright 2026 ForgeSchema. Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and third-party licenses.

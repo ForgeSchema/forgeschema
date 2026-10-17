@@ -1,8 +1,33 @@
 # ForgeSchema resume checkpoint
 
-Updated: 2026-10-15, public website licensing-copy cleanup.
+Updated: 2026-10-17, review fixes and wider schema contract.
 
-Status: COMPLETE AND PAUSED. All six original sessions, the browser demo, Apache 2.0 adoption and the first alpha release are complete. Await the owner's next direction; do not start another milestone, publish another release, create another tag or change the selected Apache 2.0 licensing automatically.
+Status: CODE AND DOCS COMPLETE, NOT RELEASED. VERSION and the CLI still report 0.1.0-alpha.1. Publishing 0.2.0 needs the owner's explicit go-ahead: update VERSION and internal/cli/cli.go together, rewrite RELEASE_NOTES.md (it still describes 0.1.0-alpha.1) and follow RELEASING.md. The website (photozeitgeist/forgeschema.com) has not been updated for these changes yet.
+
+## Review fixes and wider schema contract
+
+Owner asked on 2026-10-17 to fix every issue from a code review and suggest improvements.
+
+Fixed:
+- apply CLI flags --lock-timeout, --statement-timeout and --timeout (Go durations); ApplyOptions.Timeout replaces the fixed 60s cap.
+- Failure messages carry PostgreSQL's message, detail and SQLSTATE (inspect, verify, apply). Connection failures at transaction start stay generic so DSN details can't leak.
+- New exit codes: apply 5 for source/target drift, 6 for an unconfirmed commit. The walkthrough harness now expects 5 for stale replay.
+- Apply locks only existing tables the plan changes (ACCESS EXCLUSIVE) plus SHARE ROW EXCLUSIVE on tables referenced by new foreign keys; plan.LockedTables and --explain show the set.
+- Inspection rendered defaults with pg_get_expr(adbin, adrelid), which opens the table and waited behind other sessions' exclusive locks. It now passes relation 0 (defaults never reference columns) and skips generated expressions.
+- Independent review (separate agent, confirmed against PostgreSQL 16) found and these fixes address: SQL injection through a backslash in a text default when standard_conforming_strings is off (backslashes now rejected, and apply/inspect force the setting on); inspection stripping value-changing casts such as 'ab '::bpchar on text or '0.1'::real on double precision (now only casts PostgreSQL adds itself are stripped); numeric defaults that don't fit precision/scale; type changes locking FK partner tables outside the planned lock set (now locked up front); numeric FKs across precisions wrongly rejected; inspect/verify printing role/database names on connection errors and apply printing duplicated key values (Detail dropped; SQLSTATE classes 08/28/3D generic); target-phase drift message.
+- PLAN.md and RESUME.md moved to docs/dev; README and FEATURES no longer read as a session log.
+
+Wider contract (schema, inspect, compare, plan, verify): varchar(n)/varchar, char(n), numeric(p,s)/numeric; canonical defaults (literals plus now(), current_timestamp, localtimestamp, current_date, gen_random_uuid()); identity columns with the default TABLE_COLUMN_seq sequence; named unique constraints; unique indexes; same-schema foreign keys with actions. Planner adds: add_column with default (including NOT NULL), alter_column_type for widening only, set/drop not null, set/drop default, add_unique, unique create_index, add_foreign_key (last phase). Still blocked: drops, other type changes, identity changes and identity renames, PK changes, constraint/index replacement.
+
+Compatibility: plan format stays 1. Existing operation kinds keep their exact SQL/explanation text; examples/customer-plan.json regenerates byte-identically and both recorded walkthrough plans load (TestSavedPlansStillValidate). Fingerprints of documents without the new fields are unchanged. Blocked 0.1 plans for changes that are now plannable no longer validate.
+
+Validation (local, PostgreSQL 16.15 because 16.10/17.6 images were not available in this environment): go vet clean; go test -race -count=1 ./... passes with FORGESCHEMA_TEST_DATABASE_URL set; scripts/demo.sh walkthrough PASS; export-browser-demo.py --check and node demo tests pass. CI on 16.10 and 17.6 runs on the next push to main.
+
+New fixtures: examples/shop.yaml and testdata/postgres/002-shop.sql (hand-written DDL that must inspect to exactly that YAML). New tests: schema/extended_test.go, plan/extended_test.go, postgres/extended_test.go, more unsupported-structure and CLI flag cases.
+
+The browser demo still replays the 0.1 recordings (stale replay exit 1 there is accurate for that recording).
+
+Next, once the owner approves: push and confirm CI on both PostgreSQL versions, update the website's feature and command pages, then a release if wanted. Do not start a release without explicit approval.
 
 ## Public website licensing-copy cleanup
 

@@ -16,7 +16,7 @@ Alternatively supply your own disposable database URL in that explicit environme
 
 The harness creates a randomly named isolated schema with two synthetic customers. It inspects the schema, generates a desired model and explicit renames, saves JSON and readable plans, applies six operations, and independently verifies a match. The operations create an events table with its primary key/index, rename two customer columns, add a nullable notes column and create its index. It compares both customer rows before and after, including a NULL email.
 
-It then demonstrates stale-plan rejection (CLI exit 1) and injects one extra column to demonstrate structural drift (verify exit 4). Inspection before and after verification must agree: verification performs no repair. The harness removes its injected fixture column and verifies the target again. It checks exactly one matching history record with six operations.
+It then demonstrates stale-plan rejection (CLI exit 5) and injects one extra column to demonstrate structural drift (verify exit 4). Inspection before and after verification must agree: verification performs no repair. The harness removes its injected fixture column and verifies the target again. It checks exactly one matching history record with six operations.
 
 By default cleanup drops only the newly created demo schema; migration history remains in forgeschema_meta. It never resets the public fixture or an existing application schema. Direct fixture creation, drift injection and cleanup SQL belong to the harness, not the supported migration operation set. Use --keep-schema to retain the successful final target for manual inspection; on failure consult run.json and transcript.txt for cleanup status. Cleanup can fail after connection loss.
 
