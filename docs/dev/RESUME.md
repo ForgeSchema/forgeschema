@@ -2,7 +2,7 @@
 
 Updated: 2026-10-17, review fixes and wider schema contract.
 
-Status: owner authorized v0.2.0-alpha.1 and the website update on 2026-10-18. Code commits 4990ba6 and 10f85eb passed CI on PostgreSQL 16.10 and 17.6 (run 39090098516). VERSION, the CLI and RELEASE_NOTES.md now describe 0.2.0-alpha.1.
+Status: owner authorized v0.2.0-alpha.1 and the website update on 2026-10-18. Code commits 4990ba6 and 10f85eb passed CI on PostgreSQL 16.10 and 17.6 (run 39090098516). VERSION, the CLI and RELEASE_NOTES.md now describe 0.2.0-alpha.1. Released: https://github.com/ForgeSchema/forgeschema/releases/tag/v0.2.0-alpha.1 (prerelease, tag at 6b46b12, release run 39090351214 green on 16.10/17.6). All six archives downloaded and matched SHA256SUMS; the Linux amd64 binary reported 0.2.0-alpha.1, validated examples/shop.yaml and verified a live shop schema as a match. Website commit 6bd2fb8 (photozeitgeist/forgeschema.com): 0.2 badge, download links, Engine/Workflow/Schema Format/Roadmap/About pages and the post "ForgeSchema Second Alpha Handles Real PostgreSQL Schemas"; theme and static files untouched, Hugo 0.158.0 build passed with no broken internal links, live pages confirmed. softdevstudio.com note added (commit c918f85). Next step is not set; the owner decides.
 
 ## Review fixes and wider schema contract
 
