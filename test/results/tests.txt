@@ -1,0 +1,557 @@
+# Every test, verbose, including the database tests
+# recorded 2026-10-18 03:29 UTC with go1.24.7 linux/amd64, PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
+# command: go test -count=1 -v ./...
+
+?   	github.com/ForgeSchema/forgeschema/cmd/forgeschema	[no test files]
+?   	github.com/ForgeSchema/forgeschema/cmd/forgeschema-demo	[no test files]
+=== RUN   TestCommands
+--- PASS: TestCommands (0.00s)
+=== RUN   TestInvalidFile
+--- PASS: TestInvalidFile (0.00s)
+=== RUN   TestInspectionConfiguration
+--- PASS: TestInspectionConfiguration (0.00s)
+=== RUN   TestPlanCommands
+--- PASS: TestPlanCommands (0.00s)
+=== RUN   TestApplyInputErrors
+--- PASS: TestApplyInputErrors (0.00s)
+=== RUN   TestVerifyInputErrors
+--- PASS: TestVerifyInputErrors (0.00s)
+=== RUN   TestDetailOmitsRowDataAndConnectionIdentity
+--- PASS: TestDetailOmitsRowDataAndConnectionIdentity (0.00s)
+PASS
+ok  	github.com/ForgeSchema/forgeschema/internal/cli	0.014s
+=== RUN   TestUsageAndExplicitDatabase
+--- PASS: TestUsageAndExplicitDatabase (0.00s)
+=== RUN   TestNeverOverwritesOutput
+--- PASS: TestNeverOverwritesOutput (0.00s)
+PASS
+ok  	github.com/ForgeSchema/forgeschema/internal/demo	0.010s
+?   	github.com/ForgeSchema/forgeschema/internal/strictyaml	[no test files]
+=== RUN   TestDropsAreExplicit
+--- PASS: TestDropsAreExplicit (0.01s)
+=== RUN   TestDropKeyAForeignKeyNeeds
+--- PASS: TestDropKeyAForeignKeyNeeds (0.00s)
+=== RUN   TestRenameIntoDroppedColumn
+--- PASS: TestRenameIntoDroppedColumn (0.00s)
+=== RUN   TestConversions
+--- PASS: TestConversions (0.00s)
+=== RUN   TestLoadChanges
+--- PASS: TestLoadChanges (0.00s)
+=== RUN   TestConversionAllowlist
+--- PASS: TestConversionAllowlist (0.00s)
+=== RUN   TestShopFromEmptyOrdersOperations
+--- PASS: TestShopFromEmptyOrdersOperations (0.00s)
+=== RUN   TestAlterColumnOperations
+--- PASS: TestAlterColumnOperations (0.00s)
+=== RUN   TestStillBlocked
+--- PASS: TestStillBlocked (0.00s)
+=== RUN   TestConstraintOperationsAndLocks
+--- PASS: TestConstraintOperationsAndLocks (0.01s)
+=== RUN   TestRenamePropagatesToForeignKeys
+--- PASS: TestRenamePropagatesToForeignKeys (0.00s)
+=== RUN   TestSavedPlansStillValidate
+--- PASS: TestSavedPlansStillValidate (0.00s)
+=== RUN   TestTypeChangeLocksForeignKeyPartners
+--- PASS: TestTypeChangeLocksForeignKeyPartners (0.00s)
+=== RUN   TestStrictPlanLoad
+=== RUN   TestStrictPlanLoad/quoted-number
+=== RUN   TestStrictPlanLoad/missing-bool
+=== RUN   TestStrictPlanLoad/decimal
+=== RUN   TestStrictPlanLoad/duplicate
+=== RUN   TestStrictPlanLoad/duplicate-escaped
+=== RUN   TestStrictPlanLoad/nested-duplicate
+=== RUN   TestStrictPlanLoad/case
+=== RUN   TestStrictPlanLoad/trailing
+=== RUN   TestStrictPlanLoad/oversized
+=== RUN   TestStrictPlanLoad/invalid-root
+=== RUN   TestStrictPlanLoad/unknown
+=== RUN   TestStrictPlanLoad/missing
+=== RUN   TestStrictPlanLoad/tampered-sql
+=== RUN   TestStrictPlanLoad/bad-utf8
+=== RUN   TestStrictPlanLoad/null
+--- PASS: TestStrictPlanLoad (0.03s)
+    --- PASS: TestStrictPlanLoad/quoted-number (0.00s)
+    --- PASS: TestStrictPlanLoad/missing-bool (0.00s)
+    --- PASS: TestStrictPlanLoad/decimal (0.00s)
+    --- PASS: TestStrictPlanLoad/duplicate (0.00s)
+    --- PASS: TestStrictPlanLoad/duplicate-escaped (0.00s)
+    --- PASS: TestStrictPlanLoad/nested-duplicate (0.00s)
+    --- PASS: TestStrictPlanLoad/case (0.00s)
+    --- PASS: TestStrictPlanLoad/trailing (0.00s)
+    --- PASS: TestStrictPlanLoad/oversized (0.02s)
+    --- PASS: TestStrictPlanLoad/invalid-root (0.00s)
+    --- PASS: TestStrictPlanLoad/unknown (0.00s)
+    --- PASS: TestStrictPlanLoad/missing (0.00s)
+    --- PASS: TestStrictPlanLoad/tampered-sql (0.00s)
+    --- PASS: TestStrictPlanLoad/bad-utf8 (0.00s)
+    --- PASS: TestStrictPlanLoad/null (0.00s)
+=== RUN   TestBlockedPlanLoadsButHasNoOperations
+--- PASS: TestBlockedPlanLoadsButHasNoOperations (0.00s)
+=== RUN   TestOnlinePlanPhases
+--- PASS: TestOnlinePlanPhases (0.00s)
+=== RUN   TestPlainPlanUnchangedByOnlineOption
+--- PASS: TestPlainPlanUnchangedByOnlineOption (0.00s)
+=== RUN   TestCheckPlans
+--- PASS: TestCheckPlans (0.00s)
+=== RUN   TestEquivalentSchemas
+--- PASS: TestEquivalentSchemas (0.00s)
+=== RUN   TestRenameAndAdd
+--- PASS: TestRenameAndAdd (0.00s)
+=== RUN   TestRenameKeyAndIndexReferences
+--- PASS: TestRenameKeyAndIndexReferences (0.00s)
+=== RUN   TestCreateQuotedTable
+--- PASS: TestCreateQuotedTable (0.00s)
+=== RUN   TestBlockedChangesHaveNoSQL
+=== RUN   TestBlockedChangesHaveNoSQL/drop-column
+=== RUN   TestBlockedChangesHaveNoSQL/identity-add
+=== RUN   TestBlockedChangesHaveNoSQL/index-drop
+=== RUN   TestBlockedChangesHaveNoSQL/drop-table
+=== RUN   TestBlockedChangesHaveNoSQL/required-column
+=== RUN   TestBlockedChangesHaveNoSQL/type-change
+=== RUN   TestBlockedChangesHaveNoSQL/pk-change
+=== RUN   TestBlockedChangesHaveNoSQL/index-change
+=== RUN   TestBlockedChangesHaveNoSQL/implicit-rename
+--- PASS: TestBlockedChangesHaveNoSQL (0.01s)
+    --- PASS: TestBlockedChangesHaveNoSQL/drop-column (0.00s)
+    --- PASS: TestBlockedChangesHaveNoSQL/identity-add (0.00s)
+    --- PASS: TestBlockedChangesHaveNoSQL/index-drop (0.00s)
+    --- PASS: TestBlockedChangesHaveNoSQL/drop-table (0.00s)
+    --- PASS: TestBlockedChangesHaveNoSQL/required-column (0.00s)
+    --- PASS: TestBlockedChangesHaveNoSQL/type-change (0.00s)
+    --- PASS: TestBlockedChangesHaveNoSQL/pk-change (0.00s)
+    --- PASS: TestBlockedChangesHaveNoSQL/index-change (0.00s)
+    --- PASS: TestBlockedChangesHaveNoSQL/implicit-rename (0.00s)
+=== RUN   TestInvalidRenameIntent
+--- PASS: TestInvalidRenameIntent (0.00s)
+=== RUN   TestTamperingRejected
+--- PASS: TestTamperingRejected (0.00s)
+=== RUN   TestStrictRenames
+--- PASS: TestStrictRenames (0.00s)
+=== RUN   TestDifferentSchemasAndInvalidInput
+--- PASS: TestDifferentSchemasAndInvalidInput (0.00s)
+=== RUN   FuzzPlanLoader
+=== RUN   FuzzPlanLoader/seed#0
+=== RUN   FuzzPlanLoader/seed#1
+=== RUN   FuzzPlanLoader/seed#2
+--- PASS: FuzzPlanLoader (0.00s)
+    --- PASS: FuzzPlanLoader/seed#0 (0.00s)
+    --- PASS: FuzzPlanLoader/seed#1 (0.00s)
+    --- PASS: FuzzPlanLoader/seed#2 (0.00s)
+PASS
+ok  	github.com/ForgeSchema/forgeschema/plan	0.076s
+=== RUN   TestApplySuccessHistoryAndReplay
+    apply_test.go:61: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplySuccessHistoryAndReplay (0.06s)
+=== RUN   TestApplyNoOpAndInvalidPlans
+    apply_test.go:107: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyNoOpAndInvalidPlans (0.03s)
+=== RUN   TestApplyCompetingRuns
+    apply_test.go:136: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyCompetingRuns (0.11s)
+=== RUN   TestApplyFreshDriftCheckAfterLockWait
+    apply_test.go:187: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyFreshDriftCheckAfterLockWait (0.07s)
+=== RUN   TestApplyLockTimeout
+    apply_test.go:214: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyLockTimeout (0.16s)
+=== RUN   TestApplyExecutionFailureRollsBackAll
+    apply_test.go:249: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyExecutionFailureRollsBackAll (0.05s)
+=== RUN   TestApplyTargetVerificationRollsBack
+    apply_test.go:272: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyTargetVerificationRollsBack (0.07s)
+=== RUN   TestApplyCLI
+    apply_test.go:291: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyCLI (0.06s)
+=== RUN   TestApplyRejectsModifiedHistory
+    apply_test.go:309: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyRejectsModifiedHistory (0.08s)
+=== RUN   TestApplyInvalidOptions
+    apply_test.go:336: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyInvalidOptions (0.02s)
+=== RUN   TestApplyFreezesCallerArtifactBeforeLockWait
+    apply_test.go:346: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyFreezesCallerArtifactBeforeLockWait (0.06s)
+=== RUN   TestInspectCheckConstraints
+    check_test.go:18: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestInspectCheckConstraints (0.06s)
+=== RUN   TestApplyChecksOnPopulatedTables
+    check_test.go:75: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyChecksOnPopulatedTables (0.21s)
+=== RUN   TestRenameAndWidenColumnsWithChecks
+    check_test.go:119: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestRenameAndWidenColumnsWithChecks (0.12s)
+=== RUN   TestInspectWaitsOnLockedTableWithChecks
+    check_test.go:149: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestInspectWaitsOnLockedTableWithChecks (0.33s)
+=== RUN   TestInspectShopMatchesContract
+    extended_test.go:64: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestInspectShopMatchesContract (0.07s)
+=== RUN   TestInspectRejectsCrossSchemaForeignKey
+    extended_test.go:89: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestInspectRejectsCrossSchemaForeignKey (0.02s)
+=== RUN   TestApplyShopFromEmptySchema
+    extended_test.go:101: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyShopFromEmptySchema (0.07s)
+=== RUN   TestApplyColumnChangesOnPopulatedTables
+    extended_test.go:176: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyColumnChangesOnPopulatedTables (0.17s)
+=== RUN   TestApplyConstraintsOnPopulatedTables
+    extended_test.go:214: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyConstraintsOnPopulatedTables (0.21s)
+=== RUN   TestApplyLocksOnlyChangedTables
+    extended_test.go:243: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyLocksOnlyChangedTables (0.09s)
+=== RUN   TestApplyCLIExitCodesAndTimeouts
+    extended_test.go:267: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyCLIExitCodesAndTimeouts (0.18s)
+=== RUN   TestStandardStringsOffConnection
+    extended_test.go:308: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestStandardStringsOffConnection (0.10s)
+=== RUN   TestTypeChangeLocksForeignKeyPartnerFirst
+    extended_test.go:343: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestTypeChangeLocksForeignKeyPartnerFirst (0.27s)
+=== RUN   TestInspectFixture
+    inspect_test.go:61: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestInspectFixture (0.06s)
+=== RUN   TestEmptyAndMissingSchema
+    inspect_test.go:100: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestEmptyAndMissingSchema (0.01s)
+=== RUN   TestSupportedTypesAndOrdering
+    inspect_test.go:113: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestSupportedTypesAndOrdering (0.03s)
+=== RUN   TestUnsupportedStructures
+=== RUN   TestUnsupportedStructures/inheritance
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/check-or
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/check-no-inherit
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/custom-pk-name
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/opclass
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/table-options
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/custom-collation
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/partition
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/hash-index
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/rls
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/compression
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/function-default
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/identity-renamed-seq
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/deferrable-unique
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/nulls-not-distinct
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/check-not-valid
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/deferrable-pk
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/function
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/serial
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/fk-match-full
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/extended-statistics
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/generated
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/index-options
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/storage
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/identity-options
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/unique-include
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/unique-index-desc
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/fk-not-valid
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/domain
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/custom-type-shadow
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/check-function
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/partial-index
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/rule
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/quoted-name
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/reserved-name
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/fk-set-null-columns
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/timestamp-precision
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/unlogged
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/policy
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/expression-default
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/fk-deferrable
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/view
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/check-real
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/descending-index
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/expression-index
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/include-index
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/array
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/enum
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/sequence
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/nulls-first
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/timestamp-literal
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== RUN   TestUnsupportedStructures/materialized-view
+    inspect_test.go:181: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestUnsupportedStructures (0.92s)
+    --- PASS: TestUnsupportedStructures/inheritance (0.02s)
+    --- PASS: TestUnsupportedStructures/check-or (0.02s)
+    --- PASS: TestUnsupportedStructures/check-no-inherit (0.02s)
+    --- PASS: TestUnsupportedStructures/custom-pk-name (0.01s)
+    --- PASS: TestUnsupportedStructures/opclass (0.02s)
+    --- PASS: TestUnsupportedStructures/table-options (0.01s)
+    --- PASS: TestUnsupportedStructures/custom-collation (0.02s)
+    --- PASS: TestUnsupportedStructures/partition (0.01s)
+    --- PASS: TestUnsupportedStructures/hash-index (0.02s)
+    --- PASS: TestUnsupportedStructures/rls (0.02s)
+    --- PASS: TestUnsupportedStructures/compression (0.02s)
+    --- PASS: TestUnsupportedStructures/function-default (0.02s)
+    --- PASS: TestUnsupportedStructures/identity-renamed-seq (0.02s)
+    --- PASS: TestUnsupportedStructures/deferrable-unique (0.02s)
+    --- PASS: TestUnsupportedStructures/nulls-not-distinct (0.02s)
+    --- PASS: TestUnsupportedStructures/check-not-valid (0.06s)
+    --- PASS: TestUnsupportedStructures/deferrable-pk (0.02s)
+    --- PASS: TestUnsupportedStructures/function (0.01s)
+    --- PASS: TestUnsupportedStructures/serial (0.01s)
+    --- PASS: TestUnsupportedStructures/fk-match-full (0.02s)
+    --- PASS: TestUnsupportedStructures/extended-statistics (0.01s)
+    --- PASS: TestUnsupportedStructures/generated (0.02s)
+    --- PASS: TestUnsupportedStructures/index-options (0.02s)
+    --- PASS: TestUnsupportedStructures/storage (0.02s)
+    --- PASS: TestUnsupportedStructures/identity-options (0.02s)
+    --- PASS: TestUnsupportedStructures/unique-include (0.02s)
+    --- PASS: TestUnsupportedStructures/unique-index-desc (0.02s)
+    --- PASS: TestUnsupportedStructures/fk-not-valid (0.02s)
+    --- PASS: TestUnsupportedStructures/domain (0.01s)
+    --- PASS: TestUnsupportedStructures/custom-type-shadow (0.01s)
+    --- PASS: TestUnsupportedStructures/check-function (0.02s)
+    --- PASS: TestUnsupportedStructures/partial-index (0.02s)
+    --- PASS: TestUnsupportedStructures/rule (0.01s)
+    --- PASS: TestUnsupportedStructures/quoted-name (0.02s)
+    --- PASS: TestUnsupportedStructures/reserved-name (0.02s)
+    --- PASS: TestUnsupportedStructures/fk-set-null-columns (0.02s)
+    --- PASS: TestUnsupportedStructures/timestamp-precision (0.02s)
+    --- PASS: TestUnsupportedStructures/unlogged (0.01s)
+    --- PASS: TestUnsupportedStructures/policy (0.01s)
+    --- PASS: TestUnsupportedStructures/expression-default (0.02s)
+    --- PASS: TestUnsupportedStructures/fk-deferrable (0.02s)
+    --- PASS: TestUnsupportedStructures/view (0.01s)
+    --- PASS: TestUnsupportedStructures/check-real (0.02s)
+    --- PASS: TestUnsupportedStructures/descending-index (0.02s)
+    --- PASS: TestUnsupportedStructures/expression-index (0.03s)
+    --- PASS: TestUnsupportedStructures/include-index (0.03s)
+    --- PASS: TestUnsupportedStructures/array (0.02s)
+    --- PASS: TestUnsupportedStructures/enum (0.01s)
+    --- PASS: TestUnsupportedStructures/sequence (0.01s)
+    --- PASS: TestUnsupportedStructures/nulls-first (0.02s)
+    --- PASS: TestUnsupportedStructures/timestamp-literal (0.02s)
+    --- PASS: TestUnsupportedStructures/materialized-view (0.01s)
+=== RUN   TestScopeAndDroppedColumns
+    inspect_test.go:199: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestScopeAndDroppedColumns (0.02s)
+=== RUN   TestReadOnlyRoleAndCancellation
+    inspect_test.go:209: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestReadOnlyRoleAndCancellation (0.02s)
+=== RUN   TestOnlineApplyOnPopulatedTables
+    online_test.go:48: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestOnlineApplyOnPopulatedTables (0.37s)
+=== RUN   TestOnlineApplyResumesAfterFailedBuild
+    online_test.go:108: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestOnlineApplyResumesAfterFailedBuild (0.23s)
+=== RUN   TestOnlineBuildDoesNotBlockWriters
+    online_test.go:159: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestOnlineBuildDoesNotBlockWriters (0.66s)
+=== RUN   TestOnlineBuildAndWaitingApplyDoNotDeadlock
+    online_test.go:215: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestOnlineBuildAndWaitingApplyDoNotDeadlock (0.53s)
+=== RUN   TestGeneratedPlanSQLAgainstPostgres
+    plan_integration_test.go:18: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+    plan_integration_test.go:102: Executed 6 generated operations; snapshot matches target and both original rows are intact
+--- PASS: TestGeneratedPlanSQLAgainstPostgres (0.04s)
+=== RUN   TestStagedConversionThroughCLI
+    staged_test.go:20: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestStagedConversionThroughCLI (0.25s)
+=== RUN   TestInPlaceConversions
+    staged_test.go:110: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestInPlaceConversions (0.14s)
+=== RUN   TestDropTables
+    staged_test.go:163: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestDropTables (0.09s)
+=== RUN   TestVerifyReadOnlyRoleAndDrift
+    verify_test.go:22: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestVerifyReadOnlyRoleAndDrift (0.04s)
+=== RUN   TestVerifyUnsupportedAndCancelled
+    verify_test.go:47: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestVerifyUnsupportedAndCancelled (0.03s)
+=== RUN   TestFullCLIWorkflowAndVerification
+    verify_test.go:82: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+    verify_test.go:158: Full inspect → plan → apply → verify workflow passed: six operations, preserved rows, later drift detected without repair
+--- PASS: TestFullCLIWorkflowAndVerification (0.16s)
+=== RUN   TestVerifyRejectsBlockedPlan
+    verify_test.go:161: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestVerifyRejectsBlockedPlan (0.02s)
+=== RUN   TestApplyCancellationReleasesLocks
+    verify_test.go:178: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyCancellationReleasesLocks (0.06s)
+=== RUN   TestApplyStatementTimeoutRollsBack
+    verify_test.go:219: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyStatementTimeoutRollsBack (0.26s)
+=== RUN   TestApplyMetadataBootstrapFailureIsAtomic
+    verify_test.go:265: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyMetadataBootstrapFailureIsAtomic (0.06s)
+=== RUN   TestApplyHistoryInsertFailureRollsBackDDL
+    verify_test.go:288: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+--- PASS: TestApplyHistoryInsertFailureRollsBackDDL (0.09s)
+PASS
+ok  	github.com/ForgeSchema/forgeschema/postgres	6.782s
+=== RUN   TestNormalizeCheck
+--- PASS: TestNormalizeCheck (0.00s)
+=== RUN   TestCheckFromCatalog
+--- PASS: TestCheckFromCatalog (0.00s)
+=== RUN   TestCheckSQLAndRename
+--- PASS: TestCheckSQLAndRename (0.00s)
+=== RUN   TestCompareMatchAndOrdering
+--- PASS: TestCompareMatchAndOrdering (0.00s)
+=== RUN   TestCompareDifferenceKinds
+=== RUN   TestCompareDifferenceKinds/column_unexpected
+=== RUN   TestCompareDifferenceKinds/index_missing
+=== RUN   TestCompareDifferenceKinds/index_columns
+=== RUN   TestCompareDifferenceKinds/table_unexpected
+=== RUN   TestCompareDifferenceKinds/column_type
+=== RUN   TestCompareDifferenceKinds/column_nullability
+=== RUN   TestCompareDifferenceKinds/primary_key_columns
+=== RUN   TestCompareDifferenceKinds/index_unexpected
+=== RUN   TestCompareDifferenceKinds/table_missing
+=== RUN   TestCompareDifferenceKinds/column_missing
+--- PASS: TestCompareDifferenceKinds (0.00s)
+    --- PASS: TestCompareDifferenceKinds/column_unexpected (0.00s)
+    --- PASS: TestCompareDifferenceKinds/index_missing (0.00s)
+    --- PASS: TestCompareDifferenceKinds/index_columns (0.00s)
+    --- PASS: TestCompareDifferenceKinds/table_unexpected (0.00s)
+    --- PASS: TestCompareDifferenceKinds/column_type (0.00s)
+    --- PASS: TestCompareDifferenceKinds/column_nullability (0.00s)
+    --- PASS: TestCompareDifferenceKinds/primary_key_columns (0.00s)
+    --- PASS: TestCompareDifferenceKinds/index_unexpected (0.00s)
+    --- PASS: TestCompareDifferenceKinds/table_missing (0.00s)
+    --- PASS: TestCompareDifferenceKinds/column_missing (0.00s)
+=== RUN   TestCompareOrderedKeysAndIndexes
+--- PASS: TestCompareOrderedKeysAndIndexes (0.00s)
+=== RUN   TestCompareInvalidInputs
+--- PASS: TestCompareInvalidInputs (0.00s)
+=== RUN   TestShopExampleNormalizes
+--- PASS: TestShopExampleNormalizes (0.00s)
+=== RUN   TestNormalizeType
+--- PASS: TestNormalizeType (0.00s)
+=== RUN   TestNormalizeDefault
+--- PASS: TestNormalizeDefault (0.00s)
+=== RUN   TestDefaultFromCatalog
+--- PASS: TestDefaultFromCatalog (0.00s)
+=== RUN   TestExtendedValidation
+--- PASS: TestExtendedValidation (0.01s)
+=== RUN   TestExtendedCompare
+--- PASS: TestExtendedCompare (0.00s)
+=== RUN   TestNumericForeignKeyAcrossPrecisions
+--- PASS: TestNumericForeignKeyAcrossPrecisions (0.00s)
+=== RUN   TestLoadAndCanonical
+--- PASS: TestLoadAndCanonical (0.00s)
+=== RUN   TestRejectInvalidYAML
+=== RUN   TestRejectInvalidYAML/empty
+=== RUN   TestRejectInvalidYAML/number-as-name
+=== RUN   TestRejectInvalidYAML/quoted-version
+=== RUN   TestRejectInvalidYAML/alias
+=== RUN   TestRejectInvalidYAML/unsupported-type
+=== RUN   TestRejectInvalidYAML/missing-pk-column
+=== RUN   TestRejectInvalidYAML/duplicate-pk-column
+=== RUN   TestRejectInvalidYAML/empty-index
+=== RUN   TestRejectInvalidYAML/duplicate
+=== RUN   TestRejectInvalidYAML/tag
+=== RUN   TestRejectInvalidYAML/index-table-collision
+=== RUN   TestRejectInvalidYAML/index-pk-collision
+=== RUN   TestRejectInvalidYAML/oversized
+=== RUN   TestRejectInvalidYAML/unknown
+=== RUN   TestRejectInvalidYAML/missing-tables
+=== RUN   TestRejectInvalidYAML/anchor
+=== RUN   TestRejectInvalidYAML/missing-version
+=== RUN   TestRejectInvalidYAML/invalid-name
+=== RUN   TestRejectInvalidYAML/reserved-schema
+=== RUN   TestRejectInvalidYAML/nullable-pk
+=== RUN   TestRejectInvalidYAML/missing-index-column
+=== RUN   TestRejectInvalidYAML/multi
+=== RUN   TestRejectInvalidYAML/null
+=== RUN   TestRejectInvalidYAML/quoted-bool
+=== RUN   TestRejectInvalidYAML/nested-unknown
+--- PASS: TestRejectInvalidYAML (0.01s)
+    --- PASS: TestRejectInvalidYAML/empty (0.00s)
+    --- PASS: TestRejectInvalidYAML/number-as-name (0.00s)
+    --- PASS: TestRejectInvalidYAML/quoted-version (0.00s)
+    --- PASS: TestRejectInvalidYAML/alias (0.00s)
+    --- PASS: TestRejectInvalidYAML/unsupported-type (0.00s)
+    --- PASS: TestRejectInvalidYAML/missing-pk-column (0.00s)
+    --- PASS: TestRejectInvalidYAML/duplicate-pk-column (0.00s)
+    --- PASS: TestRejectInvalidYAML/empty-index (0.00s)
+    --- PASS: TestRejectInvalidYAML/duplicate (0.00s)
+    --- PASS: TestRejectInvalidYAML/tag (0.00s)
+    --- PASS: TestRejectInvalidYAML/index-table-collision (0.00s)
+    --- PASS: TestRejectInvalidYAML/index-pk-collision (0.00s)
+    --- PASS: TestRejectInvalidYAML/oversized (0.01s)
+    --- PASS: TestRejectInvalidYAML/unknown (0.00s)
+    --- PASS: TestRejectInvalidYAML/missing-tables (0.00s)
+    --- PASS: TestRejectInvalidYAML/anchor (0.00s)
+    --- PASS: TestRejectInvalidYAML/missing-version (0.00s)
+    --- PASS: TestRejectInvalidYAML/invalid-name (0.00s)
+    --- PASS: TestRejectInvalidYAML/reserved-schema (0.00s)
+    --- PASS: TestRejectInvalidYAML/nullable-pk (0.00s)
+    --- PASS: TestRejectInvalidYAML/missing-index-column (0.00s)
+    --- PASS: TestRejectInvalidYAML/multi (0.00s)
+    --- PASS: TestRejectInvalidYAML/null (0.00s)
+    --- PASS: TestRejectInvalidYAML/quoted-bool (0.00s)
+    --- PASS: TestRejectInvalidYAML/nested-unknown (0.00s)
+=== RUN   TestDirectValidation
+--- PASS: TestDirectValidation (0.00s)
+=== RUN   TestExamples
+--- PASS: TestExamples (0.00s)
+=== RUN   TestKeyOrderSignificant
+--- PASS: TestKeyOrderSignificant (0.00s)
+=== RUN   TestLimitsAndKeyAnchors
+--- PASS: TestLimitsAndKeyAnchors (0.00s)
+=== RUN   FuzzLoad
+=== RUN   FuzzLoad/seed#0
+=== RUN   FuzzLoad/seed#1
+--- PASS: FuzzLoad (0.00s)
+    --- PASS: FuzzLoad/seed#0 (0.00s)
+    --- PASS: FuzzLoad/seed#1 (0.00s)
+PASS
+ok  	github.com/ForgeSchema/forgeschema/schema	0.044s

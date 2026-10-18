@@ -1,0 +1,187 @@
+{
+  "format_version": 1,
+  "source": {
+    "version": 1,
+    "schema": "fs_demo_b5c1e429158ad9a5",
+    "tables": [
+      {
+        "name": "customers",
+        "columns": [
+          {
+            "name": "customer_name",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "email",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "id",
+            "type": "bigint",
+            "nullable": false
+          }
+        ],
+        "primary_key": [
+          "id"
+        ],
+        "indexes": [
+          {
+            "name": "customers_email_idx",
+            "columns": [
+              "email"
+            ]
+          },
+          {
+            "name": "customers_name_idx",
+            "columns": [
+              "customer_name",
+              "id"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "target": {
+    "version": 1,
+    "schema": "fs_demo_b5c1e429158ad9a5",
+    "tables": [
+      {
+        "name": "customers",
+        "columns": [
+          {
+            "name": "customer_id",
+            "type": "bigint",
+            "nullable": false
+          },
+          {
+            "name": "email",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "full_name",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "nullable": true
+          }
+        ],
+        "primary_key": [
+          "customer_id"
+        ],
+        "indexes": [
+          {
+            "name": "customers_email_idx",
+            "columns": [
+              "email"
+            ]
+          },
+          {
+            "name": "customers_name_idx",
+            "columns": [
+              "full_name",
+              "customer_id"
+            ]
+          },
+          {
+            "name": "customers_notes_idx",
+            "columns": [
+              "notes"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "events",
+        "columns": [
+          {
+            "name": "customer_id",
+            "type": "bigint",
+            "nullable": false
+          },
+          {
+            "name": "id",
+            "type": "bigint",
+            "nullable": false
+          }
+        ],
+        "primary_key": [
+          "id"
+        ],
+        "indexes": [
+          {
+            "name": "events_customer_idx",
+            "columns": [
+              "customer_id"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "source_fingerprint": "50bfa6b7cc77f841c7f7e34f66ab2cbac832fa5a883b5e695c399a08a5536431",
+  "target_fingerprint": "d6cdb0866ee0a45170192e4a940e20f865e9aadfc0ee53ba90d628c4cce0993c",
+  "renames": [
+    {
+      "table": "customers",
+      "from": "customer_name",
+      "to": "full_name"
+    },
+    {
+      "table": "customers",
+      "from": "id",
+      "to": "customer_id"
+    }
+  ],
+  "status": "ready",
+  "operations": [
+    {
+      "kind": "create_table",
+      "table": "events",
+      "sql": "CREATE TABLE \"fs_demo_b5c1e429158ad9a5\".\"events\" (\"customer_id\" bigint NOT NULL, \"id\" bigint NOT NULL, CONSTRAINT \"events_pkey\" PRIMARY KEY (\"id\"));",
+      "explanation": "Create a new table with its declared columns and primary key; indexes follow separately."
+    },
+    {
+      "kind": "rename_column",
+      "table": "customers",
+      "subject": "customer_name",
+      "sql": "ALTER TABLE \"fs_demo_b5c1e429158ad9a5\".\"customers\" RENAME COLUMN \"customer_name\" TO \"full_name\";",
+      "explanation": "Explicitly rename customer_name to full_name; PostgreSQL retains column data and updates existing key/index references. Requires a table lock."
+    },
+    {
+      "kind": "rename_column",
+      "table": "customers",
+      "subject": "id",
+      "sql": "ALTER TABLE \"fs_demo_b5c1e429158ad9a5\".\"customers\" RENAME COLUMN \"id\" TO \"customer_id\";",
+      "explanation": "Explicitly rename id to customer_id; PostgreSQL retains column data and updates existing key/index references. Requires a table lock."
+    },
+    {
+      "kind": "add_column",
+      "table": "customers",
+      "subject": "notes",
+      "sql": "ALTER TABLE \"fs_demo_b5c1e429158ad9a5\".\"customers\" ADD COLUMN \"notes\" text NULL;",
+      "explanation": "Add a nullable column without a default; existing rows receive NULL. Requires a table lock."
+    },
+    {
+      "kind": "create_index",
+      "table": "customers",
+      "subject": "customers_notes_idx",
+      "sql": "CREATE INDEX \"customers_notes_idx\" ON \"fs_demo_b5c1e429158ad9a5\".\"customers\" (\"notes\");",
+      "explanation": "Create an ordinary btree index after table and column changes. This is not concurrent and can block writes."
+    },
+    {
+      "kind": "create_index",
+      "table": "events",
+      "subject": "events_customer_idx",
+      "sql": "CREATE INDEX \"events_customer_idx\" ON \"fs_demo_b5c1e429158ad9a5\".\"events\" (\"customer_id\");",
+      "explanation": "Create an ordinary btree index after table and column changes. This is not concurrent and can block writes."
+    }
+  ],
+  "blocked": []
+}

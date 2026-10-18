@@ -19,7 +19,7 @@ import (
 	"github.com/ForgeSchema/forgeschema/schema"
 )
 
-const Version = "0.2.0-alpha.1"
+const Version = "0.3.0"
 const planUsage = "usage: forgeschema plan [--explain] [--online] CURRENT.yaml DESIRED.yaml [CHANGES.yaml]"
 
 const usage = `ForgeSchema — PostgreSQL schema evolution prototype

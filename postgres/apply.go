@@ -126,7 +126,7 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 	if err = coordinate(ctx, conn, "pg_try_advisory_lock", opts.LockTimeout); err != nil {
 		return fail("coordination lock", err)
 	}
-	defer conn.ExecContext(context.Background(), "SELECT pg_catalog.pg_advisory_unlock($1)", coordinationKey)
+	defer release(conn)
 	tx, err := conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return empty, &ApplyError{Stage: "begin", Err: err}
@@ -223,6 +223,15 @@ type execer interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
+// release gives up the coordination lock and session settings before the
+// connection goes back to the pool. After a cancelled context database/sql
+// may already have discarded the connection, which ends the session and its
+// lock on the server, and touching it then can panic inside database/sql.
+func release(conn *sql.Conn) {
+	defer func() { _ = recover() }()
+	_, _ = conn.ExecContext(context.Background(), "SELECT pg_catalog.pg_advisory_unlock_all(); RESET ALL")
+}
+
 type querier interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
@@ -305,7 +314,7 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 	defer func() {
 		// The connection goes back to the pool: release the session lock and
 		// settings. A broken connection is discarded by the driver anyway.
-		_, _ = conn.ExecContext(context.Background(), "SELECT pg_catalog.pg_advisory_unlock_all(); RESET ALL")
+		release(conn)
 		conn.Close()
 	}()
 	committed := false

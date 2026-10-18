@@ -1,0 +1,33 @@
+version completed with expected exit 0
+ForgeSchema walkthrough: CLI 0.3.0; PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1); isolated schema fs_demo_b5c1e429158ad9a5
+inspect fs_demo_b5c1e429158ad9a5 completed with expected exit 0 → current.json
+plan test/results/walkthrough/current.json test/results/walkthrough/desired.json test/results/walkthrough/renames.yaml completed with expected exit 0 → reviewed-plan.json
+plan --explain test/results/walkthrough/current.json test/results/walkthrough/desired.json test/results/walkthrough/renames.yaml completed with expected exit 0 → review.txt
+Review printed before disposable execution:
+ForgeSchema plan: ready
+Source: 50bfa6b7cc77f841c7f7e34f66ab2cbac832fa5a883b5e695c399a08a5536431
+Target: d6cdb0866ee0a45170192e4a940e20f865e9aadfc0ee53ba90d628c4cce0993c
+1. Create a new table with its declared columns and primary key; indexes follow separately.
+CREATE TABLE "fs_demo_b5c1e429158ad9a5"."events" ("customer_id" bigint NOT NULL, "id" bigint NOT NULL, CONSTRAINT "events_pkey" PRIMARY KEY ("id"));
+2. Explicitly rename customer_name to full_name; PostgreSQL retains column data and updates existing key/index references. Requires a table lock.
+ALTER TABLE "fs_demo_b5c1e429158ad9a5"."customers" RENAME COLUMN "customer_name" TO "full_name";
+3. Explicitly rename id to customer_id; PostgreSQL retains column data and updates existing key/index references. Requires a table lock.
+ALTER TABLE "fs_demo_b5c1e429158ad9a5"."customers" RENAME COLUMN "id" TO "customer_id";
+4. Add a nullable column without a default; existing rows receive NULL. Requires a table lock.
+ALTER TABLE "fs_demo_b5c1e429158ad9a5"."customers" ADD COLUMN "notes" text NULL;
+5. Create an ordinary btree index after table and column changes. This is not concurrent and can block writes.
+CREATE INDEX "customers_notes_idx" ON "fs_demo_b5c1e429158ad9a5"."customers" ("notes");
+6. Create an ordinary btree index after table and column changes. This is not concurrent and can block writes.
+CREATE INDEX "events_customer_idx" ON "fs_demo_b5c1e429158ad9a5"."events" ("customer_id");
+Locks: ACCESS EXCLUSIVE on customers
+Review only: this planning command does not execute SQL.
+
+apply test/results/walkthrough/reviewed-plan.json completed with expected exit 0 → apply-result.json
+verify --plan test/results/walkthrough/reviewed-plan.json completed with expected exit 0 → verify-match.json
+apply test/results/walkthrough/reviewed-plan.json completed with expected exit 5 → replay-error.txt
+inspect fs_demo_b5c1e429158ad9a5 completed with expected exit 0 → before-drift-check.json
+verify --plan test/results/walkthrough/reviewed-plan.json completed with expected exit 4 → verify-drift.json
+inspect fs_demo_b5c1e429158ad9a5 completed with expected exit 0 → after-drift-check.json
+verify test/results/walkthrough/desired.json completed with expected exit 0 → verify-final.json
+PASS: six operations, two original rows preserved, stale replay rejected, drift detected without repair, target restored.
+Dropped only isolated demo schema fs_demo_b5c1e429158ad9a5; migration history is retained.

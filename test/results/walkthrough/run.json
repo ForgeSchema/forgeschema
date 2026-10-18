@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "schema": "fs_demo_b5c1e429158ad9a5",
+  "postgresql_version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "cli_version": "0.3.0",
+  "operations": 6,
+  "rows_preserved": 2,
+  "plan_id": "8629e4c2002a45d266d6928528206527d31a9b4b73140fddb59bf133c1f85631",
+  "migration_id": "b18de09bbbf15a244595899b2fb9b93a",
+  "drift_exit": 4,
+  "replay_exit": 5,
+  "cleanup": "dropped"
+}
