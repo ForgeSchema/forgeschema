@@ -1,24 +1,26 @@
 # Command reference
 
-Build with Go 1.24+: go build -o bin/forgeschema ./cmd/forgeschema. The CLI version is 0.2.0-alpha.1, an alpha prerelease; downloadable binaries and checksums are on the GitHub release page. All database commands use DATABASE_URL from the environment; keep credentials out of arguments and logs.
+Build with Go 1.24+: go build -o bin/forgeschema ./cmd/forgeschema. The CLI version is 0.3.0; downloadable binaries and checksums are on the GitHub release page. All database commands use DATABASE_URL from the environment; keep credentials out of arguments and logs.
 
 | Command | Result |
 | --- | --- |
 | forgeschema validate SCHEMA.yaml | Strictly validate YAML; print normalized canonical JSON. |
 | forgeschema inspect SCHEMA_NAME | Read supported PostgreSQL catalog structures; print canonical JSON. |
-| forgeschema plan SOURCE TARGET [RENAMES.yaml] | Offline comparison; print format 1 JSON plan. Inputs accept schema YAML or inspection JSON. |
-| forgeschema plan --explain SOURCE TARGET [RENAMES.yaml] | Print readable operations or blockers without executing SQL. |
-| forgeschema plan --online SOURCE TARGET [RENAMES.yaml] | Build indexes and unique constraints on existing tables concurrently, in a three-phase plan that apply can resume; combine with --explain. |
+| forgeschema plan SOURCE TARGET [CHANGES.yaml] | Offline comparison; print format 1 JSON plan. Inputs accept schema YAML or inspection JSON. |
+| forgeschema plan --explain SOURCE TARGET [CHANGES.yaml] | Print readable operations or blockers without executing SQL. |
+| forgeschema plan --online SOURCE TARGET [CHANGES.yaml] | Build indexes and unique constraints on existing tables concurrently, in a three-phase plan that apply can resume; combine with --explain. |
 | forgeschema apply [--lock-timeout D] [--statement-timeout D] [--timeout D] PLAN.json | Strictly validate the saved ready artifact, lock the tables it changes, check the source, apply transactionally, verify the target and record history. D is a duration such as 5s, 30m or 1h. |
 | forgeschema verify EXPECTED | Read-only comparison with a complete desired schema YAML/inspection JSON. |
 | forgeschema verify --plan PLAN.json | Strictly validate a ready plan and compare its target with the database. |
 | forgeschema version | Print development version. |
 | forgeschema help | Print usage. |
 
+CHANGES.yaml is the optional change file: the column renames, drops and type conversions a plan may make. Nothing is dropped or converted unless it is listed there; see PLANNING.md.
+
 ```sh
 ./bin/forgeschema inspect public > current.json
-./bin/forgeschema plan current.json desired.yaml renames.yaml > reviewed-plan.json
-./bin/forgeschema plan --explain current.json desired.yaml renames.yaml
+./bin/forgeschema plan current.json desired.yaml changes.yaml > reviewed-plan.json
+./bin/forgeschema plan --explain current.json desired.yaml changes.yaml
 # Review the artifact and coordinate external DDL before execution.
 ./bin/forgeschema apply reviewed-plan.json
 ./bin/forgeschema verify --plan reviewed-plan.json

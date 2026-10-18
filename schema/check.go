@@ -601,3 +601,19 @@ func RenameCheckColumns(cols map[string]Column, expr string, renames map[string]
 	}
 	return renderTerms(ts, plainIdent)
 }
+
+// CheckColumns lists the columns a canonical check expression over cols uses.
+func CheckColumns(cols map[string]Column, expr string) []string {
+	ts, err := checkTerms(cols, expr, false)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, t := range ts {
+		out = append(out, t.column)
+		if t.other != "" {
+			out = append(out, t.other)
+		}
+	}
+	return out
+}

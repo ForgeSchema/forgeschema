@@ -5,7 +5,7 @@ ForgeSchema applies an exact supported plan, without recalculating a different m
 ```sh
 # DATABASE_URL is already set securely in the environment.
 ./bin/forgeschema inspect public > current.json
-./bin/forgeschema plan current.json desired.yaml renames.yaml > reviewed-plan.json
+./bin/forgeschema plan current.json desired.yaml changes.yaml > reviewed-plan.json
 # Read the artifact and its explained operations before executing that file.
 ./bin/forgeschema apply reviewed-plan.json
 ```

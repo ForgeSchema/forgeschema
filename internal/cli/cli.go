@@ -20,14 +20,14 @@ import (
 )
 
 const Version = "0.2.0-alpha.1"
-const planUsage = "usage: forgeschema plan [--explain] [--online] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]"
+const planUsage = "usage: forgeschema plan [--explain] [--online] CURRENT.yaml DESIRED.yaml [CHANGES.yaml]"
 
 const usage = `ForgeSchema — PostgreSQL schema evolution prototype
 Usage:
   forgeschema version
   forgeschema validate SCHEMA.yaml
   forgeschema inspect SCHEMA_NAME
-  forgeschema plan [--explain] [--online] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]
+  forgeschema plan [--explain] [--online] CURRENT.yaml DESIRED.yaml [CHANGES.yaml]
   forgeschema apply [--lock-timeout 5s] [--statement-timeout 30s] [--timeout 60s] PLAN.json
   forgeschema verify EXPECTED.yaml
   forgeschema verify --plan PLAN.json
@@ -207,19 +207,19 @@ func Run(args []string, out, errs io.Writer) int {
 		if err != nil {
 			return fail(errs, err.Error(), 1)
 		}
-		renames := []plan.Rename{}
+		changes := plan.Changes{Renames: []plan.Rename{}}
 		if len(inputs) == 3 {
 			f, err := os.Open(inputs[2])
 			if err != nil {
 				return fail(errs, err.Error(), 1)
 			}
-			renames, err = plan.LoadRenames(f)
+			changes, err = plan.LoadChanges(f)
 			f.Close()
 			if err != nil {
 				return fail(errs, err.Error(), 1)
 			}
 		}
-		p, err := plan.BuildWith(src, dst, renames, plan.Options{Online: online})
+		p, err := plan.BuildWith(src, dst, changes.Renames, plan.Options{Online: online, Drops: changes.Drops, Conversions: changes.Conversions})
 		if err != nil {
 			return fail(errs, err.Error(), 1)
 		}

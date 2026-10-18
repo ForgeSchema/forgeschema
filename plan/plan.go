@@ -54,6 +54,10 @@ type Plan struct {
 	// CONCURRENTLY, outside the migration transaction. Omitted when false, so
 	// plans without it keep their 0.1/0.2 JSON and plan ID.
 	Online bool `json:"online,omitempty"`
+	// Drops and Conversions are the explicit drop and type conversion
+	// intent; omitted when empty, like Online.
+	Drops       []Drop       `json:"drops,omitempty"`
+	Conversions []Conversion `json:"conversions,omitempty"`
 }
 
 // Options select how Build plans supported changes.
@@ -61,11 +65,18 @@ type Options struct {
 	// Online builds new indexes and unique constraints on existing tables
 	// concurrently: see APPLY.md for the three phases this gives apply.
 	Online bool
+	// Drops lists objects the plan may delete; Conversions lists columns
+	// whose type may change by converting the stored values.
+	Drops       []Drop
+	Conversions []Conversion
 }
 
 // Operation kinds that apply runs outside a transaction.
 const ConcurrentIndex = "create_index_concurrently"
 
+// LoadRenames reads a rename-only change file. A file with drops or
+// conversions fails here, as RenameFile has no such fields; LoadChanges
+// reads it.
 func LoadRenames(r io.Reader) ([]Rename, error) {
 	var f RenameFile
 	if err := strictyaml.Decode(r, &f); err != nil {
@@ -222,6 +233,13 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 		return p, err
 	}
 	sm, tm := tables(src), tables(dst)
+	drops, conversions := sortDrops(opts.Drops), sortConversions(opts.Conversions)
+	freed := map[string]bool{} // column names a drop frees for a rename
+	for _, d := range drops {
+		if kind, name, _ := d.kind(); kind == "column" {
+			freed[d.Table+"."+name] = true
+		}
+	}
 	seenFrom, seenTo := map[string]bool{}, map[string]bool{}
 	for _, r := range hints {
 		st, ok := sm[r.Table]
@@ -233,6 +251,7 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 		_, fromOK := sc[r.From]
 		_, toOK := tc[r.To]
 		_, occupied := sc[r.To]
+		occupied = occupied && !freed[r.Table+"."+r.To]
 		_, reused := tc[r.From]
 		if r.From == r.To || !fromOK || !toOK || occupied || reused {
 			return p, fmt.Errorf("rename %s.%s to %s: source must exist, target must be new, and old name must not be reused", r.Table, r.From, r.To)
@@ -244,6 +263,13 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 		seenFrom[fromKey] = true
 		seenTo[toKey] = true
 	}
+	if err := checkDrops(drops, sm, tm, hints); err != nil {
+		return p, err
+	}
+	if err := checkConversions(conversions, sm, tm, hints); err != nil {
+		return p, err
+	}
+	dropFromWorking(&working, drops)
 	// Apply explicit identities to a separate comparison copy. PostgreSQL adjusts
 	// existing key, constraint, index and foreign key references when a column
 	// is renamed, including references held by other tables.
@@ -285,6 +311,12 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 	}
 	wm := tables(working)
 	p = Plan{FormatVersion: FormatVersion, Source: src, Target: dst, Renames: hints, Status: "ready", Operations: []Operation{}, Blocked: []Blocker{}, Online: opts.Online}
+	if len(drops) > 0 {
+		p.Drops = drops
+	}
+	if len(conversions) > 0 {
+		p.Conversions = conversions
+	}
 	if p.SourceFingerprint, err = src.Fingerprint(); err != nil {
 		return Plan{}, err
 	}
@@ -294,6 +326,11 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 	var createOps, renameOps, addOps, alterOps, checkOps, indexOps, concurrentOps, attachOps, foreignKeyOps []Operation
 	block := func(object, reason string) { p.Blocked = append(p.Blocked, Blocker{object, reason}) }
 	alter := func(table string) string { return "ALTER TABLE " + qualified(dst.Schema, table) }
+	dropOps := dropOperations(src, drops, block)
+	converted := map[string]bool{}
+	for _, c := range conversions {
+		converted[c.Table+"."+c.Column] = true
+	}
 	for _, r := range hints {
 		if columns(sm[r.Table])[r.From].Identity != "" {
 			block(r.Table+"."+r.From, "renaming an identity column is unsupported; PostgreSQL keeps the old identity sequence name")
@@ -406,7 +443,29 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 				block(object, "adding, removing or changing an identity is unsupported")
 				continue
 			}
-			if old.Type != c.Type {
+			convertedDefault := false
+			if old.Type != c.Type && !widening(old.Type, c.Type) && converted[tt.Name+"."+c.Name] {
+				if reason := conversionBlocker(tt.Name, c.Name, st, tt, working, dst); reason != "" {
+					block(object, reason)
+					continue
+				}
+				op, reason := convertOperation(alter(tt.Name), old, c)
+				if reason != "" {
+					block(object, reason)
+					continue
+				}
+				op.Table = tt.Name
+				// A default rarely survives a type change, so it is
+				// removed first and the target's set afterwards.
+				if old.Default != "" {
+					alterOps = append(alterOps, Operation{Kind: "drop_default", Table: tt.Name, Subject: c.Name, SQL: alter(tt.Name) + " ALTER COLUMN " + quote(c.Name) + " DROP DEFAULT;", Explanation: "Remove the default before converting the column. Existing rows keep their values. Metadata-only; requires a brief table lock."})
+				}
+				alterOps = append(alterOps, op)
+				if c.Default != "" {
+					alterOps = append(alterOps, Operation{Kind: "set_default", Table: tt.Name, Subject: c.Name, SQL: alter(tt.Name) + " ALTER COLUMN " + quote(c.Name) + " SET DEFAULT " + schema.DefaultSQL(c.Default) + ";", Explanation: "Set the default to " + c.Default + " for future inserts. Existing rows keep their values. Metadata-only; requires a brief table lock."})
+				}
+				convertedDefault = true
+			} else if old.Type != c.Type {
 				if widening(old.Type, c.Type) {
 					alterOps = append(alterOps, Operation{Kind: "alter_column_type", Table: tt.Name, Subject: c.Name, SQL: alter(tt.Name) + " ALTER COLUMN " + quote(c.Name) + " TYPE " + c.Type + ";", Explanation: "Widen " + old.Type + " to " + c.Type + ". The stored values stay valid, so PostgreSQL does not rewrite the table. Requires a table lock."})
 				} else {
@@ -419,7 +478,7 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 			if !old.Nullable && c.Nullable {
 				alterOps = append(alterOps, Operation{Kind: "drop_not_null", Table: tt.Name, Subject: c.Name, SQL: alter(tt.Name) + " ALTER COLUMN " + quote(c.Name) + " DROP NOT NULL;", Explanation: "Allow NULL in the column. Metadata-only; requires a brief table lock."})
 			}
-			if old.Default != c.Default {
+			if old.Default != c.Default && !convertedDefault {
 				if c.Default == "" {
 					alterOps = append(alterOps, Operation{Kind: "drop_default", Table: tt.Name, Subject: c.Name, SQL: alter(tt.Name) + " ALTER COLUMN " + quote(c.Name) + " DROP DEFAULT;", Explanation: "Remove the column default. Existing rows keep their values. Metadata-only; requires a brief table lock."})
 				} else {
@@ -508,7 +567,7 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 	// Concurrent builds come after every transactional change they may
 	// depend on, and attaching constraints and adding foreign keys after
 	// them, so apply can split an online plan into three phases.
-	for _, phase := range [][]Operation{createOps, renameOps, addOps, alterOps, checkOps, indexOps, concurrentOps, attachOps, foreignKeyOps} {
+	for _, phase := range [][]Operation{dropOps, createOps, renameOps, addOps, alterOps, checkOps, indexOps, concurrentOps, attachOps, foreignKeyOps} {
 		p.Operations = append(p.Operations, phase...)
 	}
 	return p, nil
@@ -561,6 +620,15 @@ func (p Plan) LockedTablesFor(ops []Operation) (exclusive, referenced []string) 
 							ex[other] = true
 						}
 					}
+				}
+			}
+		}
+		// Dropping a foreign key, or a table with foreign keys, also changes
+		// the referenced table.
+		if op.Kind == "drop_foreign_key" || op.Kind == "drop_table" {
+			for _, fk := range existing[op.Table].ForeignKeys {
+				if op.Kind == "drop_table" || fk.Name == op.Subject {
+					ex[fk.References.Table] = true
 				}
 			}
 		}
@@ -663,7 +731,7 @@ func (p Plan) Intermediate() (afterFirst, beforeFinal schema.Document, err error
 // rejects altered SQL, operations, explanations, status or fingerprints. It is
 // an internal consistency check, not a signature or proof the database matches.
 func (p Plan) Validate() error {
-	rebuilt, err := BuildWith(p.Source, p.Target, p.Renames, Options{Online: p.Online})
+	rebuilt, err := BuildWith(p.Source, p.Target, p.Renames, Options{Online: p.Online, Drops: p.Drops, Conversions: p.Conversions})
 	if err != nil {
 		return err
 	}
@@ -696,6 +764,18 @@ func (p Plan) Summary() (string, error) {
 	first, concurrent, final := p.Phases()
 	if len(concurrent) > 0 {
 		fmt.Fprintf(&b, "Online plan in three phases: %d operations in a first transaction, %d concurrent index builds outside any transaction, then %d in a final transaction that also verifies the target and records history.\n", len(first), len(concurrent), len(final))
+	}
+	var deletes []string
+	for _, op := range p.Operations {
+		switch op.Kind {
+		case "drop_table":
+			deletes = append(deletes, "table "+op.Table)
+		case "drop_column":
+			deletes = append(deletes, "column "+op.Table+"."+op.Subject)
+		}
+	}
+	if len(deletes) > 0 {
+		fmt.Fprintf(&b, "This plan permanently deletes data: %s.\n", strings.Join(deletes, ", "))
 	}
 	for i, op := range p.Operations {
 		fmt.Fprintf(&b, "%d. %s\n%s\n", i+1, op.Explanation, op.SQL)
