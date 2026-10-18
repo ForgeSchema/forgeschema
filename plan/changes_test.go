@@ -87,6 +87,7 @@ func TestDropsAreExplicit(t *testing.T) {
 	}
 	want := []string{
 		"drop_foreign_key note_tags note_tags_note_fkey",
+		"drop_foreign_key notes notes_customer_fkey",
 		"drop_check customers customers_legacy_check",
 		"drop_index customers customers_legacy_idx",
 		"drop_column customers legacy_code",
@@ -141,6 +142,40 @@ func TestDropsAreExplicit(t *testing.T) {
 			t.Errorf("%s: accepted", name)
 		}
 	}
+}
+
+func TestDropKeyAForeignKeyNeeds(t *testing.T) {
+	src := doc(t, stagedBase)
+	src.Tables[0].Unique = []schema.Unique{{Name: "customers_amount_key", Columns: []string{"amount"}}}
+	tags := table(&src, "note_tags")
+	tags.Columns = append(tags.Columns, schema.Column{Name: "amount", Type: "text", Nullable: true})
+	tags.ForeignKeys = append(tags.ForeignKeys, schema.ForeignKey{Name: "notes_amount_fkey", Columns: []string{"amount"}, References: schema.Reference{Table: "customers", Columns: []string{"amount"}}})
+	src.Tables[0].Indexes = append(src.Tables[0].Indexes, schema.Index{Name: "customers_amount_idx", Columns: []string{"amount"}, Unique: true})
+	dst, _ := schema.Normalize(src)
+	dst.Tables[0].Unique = nil
+	p, err := BuildWith(src, dst, nil, Options{Drops: []Drop{{Table: "customers", Unique: "customers_amount_key"}}})
+	if err != nil || p.Status != "blocked" || !strings.Contains(p.Blocked[0].Reason, "notes_amount_fkey") {
+		t.Fatalf("%+v %v", p.Blocked, err)
+	}
+	// With the referencing table dropped too, its keys go first.
+	dst.Tables = []schema.Table{*table(&dst, "customers"), *table(&dst, "notes")}
+	dst.Tables[0].Indexes = []schema.Index{{Name: "customers_legacy_idx", Columns: []string{"legacy_code"}}}
+	p, err = BuildWith(src, dst, nil, Options{Drops: []Drop{{Table: "note_tags"}, {Table: "customers", Unique: "customers_amount_key"}, {Table: "customers", Index: "customers_amount_idx"}}})
+	if err != nil || p.Status != "ready" {
+		t.Fatalf("%+v %v", p.Blocked, err)
+	}
+	if got := opList(p); got[0] != "drop_foreign_key note_tags note_tags_note_fkey" || got[1] != "drop_foreign_key note_tags notes_amount_fkey" || got[2] != "drop_unique customers customers_amount_key" {
+		t.Fatalf("operations %v", got)
+	}
+}
+
+func table(d *schema.Document, name string) *schema.Table {
+	for i := range d.Tables {
+		if d.Tables[i].Name == name {
+			return &d.Tables[i]
+		}
+	}
+	return nil
 }
 
 func TestRenameIntoDroppedColumn(t *testing.T) {
@@ -246,5 +281,27 @@ func TestLoadChanges(t *testing.T) {
 	}
 	if _, err := LoadRenames(strings.NewReader("version: 1\ncolumns: []\ndrops:\n- table: t\n")); err == nil {
 		t.Error("rename loader ignored drops")
+	}
+}
+
+func TestConversionAllowlist(t *testing.T) {
+	for _, c := range []struct{ from, to string }{
+		{"integer", "bigint"}, {"bigint", "integer"}, {"numeric(10,3)", "numeric(10,2)"}, {"double precision", "integer"}, {"real", "double precision"},
+		{"text", "integer"}, {"text", "uuid"}, {"text", "boolean"}, {"character varying(20)", "text"}, {"integer", "text"}, {"jsonb", "text"},
+		{"date", "timestamp without time zone"}, {"boolean", "integer"},
+	} {
+		if r := conversionAllowed(c.from, c.to); r != "" {
+			t.Errorf("%s to %s blocked: %s", c.from, c.to, r)
+		}
+	}
+	for _, c := range []struct{ from, to string }{
+		{"timestamp with time zone", "date"}, {"timestamp without time zone", "timestamp with time zone"}, {"date", "timestamp with time zone"},
+		{"double precision", "real"}, {"integer", "double precision"}, {"integer", "boolean"}, {"text", "jsonb"}, {"text", "date"},
+		{"timestamp with time zone", "text"}, {"real", "text"}, {"bytea", "text"}, {"text", "bytea"}, {"integer", "character varying(5)"},
+		{"uuid", "integer"}, {"boolean", "uuid"},
+	} {
+		if r := conversionAllowed(c.from, c.to); r == "" {
+			t.Errorf("%s to %s allowed", c.from, c.to)
+		}
 	}
 }

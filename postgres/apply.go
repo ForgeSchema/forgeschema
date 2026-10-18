@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -113,19 +114,28 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 		return applyOnline(ctx, db, p, opts, id)
 	}
 	result := ApplyResult{Status: "no_changes", PlanID: id, TargetFingerprint: p.TargetFingerprint}
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	fail := func(stage string, err error) (ApplyResult, error) { return empty, &ApplyError{Stage: stage, Err: err} }
+	// The coordination lock is taken on the connection, by polling outside
+	// any transaction, before the migration transaction begins; see
+	// coordinate.
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return empty, &ApplyError{Stage: "begin", Err: err}
+	}
+	defer conn.Close()
+	if err = coordinate(ctx, conn, "pg_try_advisory_lock", opts.LockTimeout); err != nil {
+		return fail("coordination lock", err)
+	}
+	defer conn.ExecContext(context.Background(), "SELECT pg_catalog.pg_advisory_unlock($1)", coordinationKey)
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return empty, &ApplyError{Stage: "begin", Err: err}
 	}
 	defer tx.Rollback()
-	fail := func(stage string, err error) (ApplyResult, error) { return empty, &ApplyError{Stage: stage, Err: err} }
 	for _, s := range []struct{ name, value string }{{"search_path", "pg_catalog"}, {"application_name", "forgeschema-apply"}, {"standard_conforming_strings", "on"}, {"lock_timeout", fmt.Sprintf("%dms", opts.LockTimeout.Milliseconds())}, {"statement_timeout", fmt.Sprintf("%dms", opts.StatementTimeout.Milliseconds())}} {
 		if _, err = tx.ExecContext(ctx, "SELECT pg_catalog.set_config($1,$2,true)", s.name, s.value); err != nil {
 			return fail("configuration", err)
 		}
-	}
-	if _, err = tx.ExecContext(ctx, "SELECT pg_catalog.pg_advisory_xact_lock($1)", coordinationKey); err != nil {
-		return fail("coordination lock", err)
 	}
 	// Lock only the existing tables the plan changes, plus SHARE ROW EXCLUSIVE
 	// on tables referenced by new foreign keys, and hold the locks until
@@ -213,6 +223,41 @@ type execer interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
+type querier interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+// ErrCoordinationBusy means another ForgeSchema apply held the coordination
+// lock for longer than the lock timeout.
+var ErrCoordinationBusy = errors.New("another ForgeSchema apply is running in this database")
+
+// coordinate takes the session coordination lock by polling with
+// autocommit statements outside any transaction. A concurrent index build in
+// another apply waits for every transaction that held a snapshot while it
+// started, until that transaction ends; a waiter blocked in a transaction,
+// or polling inside one, would be such a transaction, and the two would wait
+// on each other.
+func coordinate(ctx context.Context, q querier, fn string, wait time.Duration) error {
+	deadline := time.Now().Add(wait)
+	for {
+		var ok bool
+		if err := q.QueryRowContext(ctx, "SELECT pg_catalog."+fn+"($1)", coordinationKey).Scan(&ok); err != nil {
+			return err
+		}
+		if ok {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("%w (waited %s)", ErrCoordinationBusy, wait)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
+
 func lockTables(ctx context.Context, q execer, schemaName string, exclusive, referenced []string) error {
 	for _, l := range []struct {
 		tables []string
@@ -272,7 +317,7 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 			return fail("configuration", err)
 		}
 	}
-	if _, err = conn.ExecContext(ctx, "SELECT pg_catalog.pg_advisory_lock($1)", coordinationKey); err != nil {
+	if err = coordinate(ctx, conn, "pg_try_advisory_lock", opts.LockTimeout); err != nil {
 		return fail("coordination lock", err)
 	}
 	built := map[string]bool{}
@@ -336,13 +381,20 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 	}
 	committed = true
 
-	// Phase 2: each build on its own, outside a transaction.
+	// Phase 2: each build on its own, outside a transaction. A build waits
+	// for every older transaction in the database, and that wait counts as a
+	// lock wait, so lock_timeout is off here; statement_timeout and the
+	// overall deadline still bound it.
+	if _, err = conn.ExecContext(ctx, "SELECT pg_catalog.set_config('lock_timeout','0',false)"); err != nil {
+		return fail("configuration", err)
+	}
 	for _, op := range concurrent {
 		stage := "concurrent index " + op.Subject
 		var valid sql.NullBool
 		err := conn.QueryRowContext(ctx, `SELECT i.indisvalid AND i.indisready AND i.indislive FROM pg_catalog.pg_class c
  JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace JOIN pg_catalog.pg_index i ON i.indexrelid=c.oid
- WHERE n.nspname=$1 AND c.relname=$2`, p.Source.Schema, op.Subject).Scan(&valid)
+ JOIN pg_catalog.pg_class t ON t.oid=i.indrelid
+ WHERE n.nspname=$1 AND c.relname=$2 AND t.relname=$3`, p.Source.Schema, op.Subject, op.Table).Scan(&valid)
 		switch {
 		case err == sql.ErrNoRows:
 		case err != nil:
@@ -360,6 +412,9 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 	}
 
 	// Phase 3: attach constraints, add foreign keys, verify, record history.
+	if _, err = conn.ExecContext(ctx, "SELECT pg_catalog.set_config('lock_timeout',$1,false)", fmt.Sprintf("%dms", opts.LockTimeout.Milliseconds())); err != nil {
+		return fail("configuration", err)
+	}
 	tx, err = conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return fail("begin", err)
@@ -374,7 +429,7 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 		return fail("intermediate inspection", err)
 	}
 	if got := fingerprint(live); got != fingerprint(beforeFinal) {
-		return empty, &DriftError{"intermediate", fingerprint(beforeFinal), got}
+		return empty, &DriftError{"final", fingerprint(beforeFinal), got}
 	}
 	if err = prepareHistory(ctx, tx); err != nil {
 		return fail("history validation", err)

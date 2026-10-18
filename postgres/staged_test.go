@@ -96,7 +96,7 @@ drops:
   check: order_lines_quantity_check
 `)
 	var total, rows int
-	if err := db.QueryRow("SELECT sum(quantity), count(*) FROM " + name + ".order_lines").Scan(&total, &rows); err != nil || total != 8 || rows != 2 {
+	if err := db.QueryRow("SELECT sum(quantity), count(*) FROM "+name+".order_lines").Scan(&total, &rows); err != nil || total != 8 || rows != 2 {
 		t.Fatalf("data not carried over: %d %d %v", total, rows, err)
 	}
 	if got := column(ptr(inspect()), "order_lines", "quantity"); got == nil || got.Type != "bigint" || got.Nullable {

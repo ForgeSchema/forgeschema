@@ -44,11 +44,23 @@ Column identities are remapped in a comparison copy, including their primary key
 
 Removing an object from the target blocks the plan unless the change file lists it under drops. Each drop names a table and, optionally, one column, index, unique, foreign_key or check on it. The object must exist in the source and be absent from the target. A table drop takes its own columns, indexes and constraints with it; list only the table. Everything else that would go must be listed: when a column is dropped, the indexes, unique constraints, foreign keys and checks that use it must be listed too, and so must foreign keys in other tables that reference a dropped table or column. Otherwise the plan is blocked and says which entry is missing. A primary key column cannot be dropped, since changing a primary key is unsupported.
 
-Drops run before everything else, in this order: drop_foreign_key, drop_check, drop_unique, drop_index, drop_column, drop_table. Foreign keys between two dropped tables are removed first (drop_foreign_key), so the tables can go in any order. drop_column and drop_table delete data permanently; their explanations say so, and --explain starts with a line listing every column and table the plan deletes. PostgreSQL's DROP fails, and the migration rolls back, if an object outside the plan still depends on the dropped one. Dropping a foreign key, or a table that has one, also locks the referenced table.
+Drops run before everything else, in this order: drop_foreign_key, drop_check, drop_unique, drop_index, drop_column, drop_table. A dropped table's foreign keys to other tables are removed first (drop_foreign_key), so the keys and columns they reference can be dropped and the tables can go in any order. PostgreSQL ties each foreign key to one unique index of the referenced columns, and the schema does not say which, so dropping a unique constraint or unique index is blocked while a kept foreign key references the same columns. drop_column and drop_table delete data permanently; their explanations say so, and --explain starts with a line listing every column and table the plan deletes. PostgreSQL's DROP fails, and the migration rolls back, if an object outside the plan still depends on the dropped one. Dropping a foreign key, or a table that has one, also locks the referenced table.
 
 ### Conversions
 
-A type change that is not one of the widenings below blocks the plan unless the column is listed under conversions, by its target name. A listed conversion becomes convert_column_type: ALTER COLUMN ... TYPE with USING column::type, so PostgreSQL converts each stored value. It rewrites the table and its indexes under an exclusive lock, and the migration rolls back if any value does not convert (text 'x' to integer fails with 22P02). The explanation notes rounding: numeric, real or double precision to an integer rounds fractions, and a numeric with a smaller scale rounds to that scale. Between text types there is no USING clause, so a value longer than a new varchar(n) or char(n) length makes the conversion fail (22001) instead of being cut short; converting another type family to a length-limited text type is blocked for the same reason. A default is dropped before the conversion and the target's default set after it. Identity columns, columns in a check constraint that stays, and columns in a foreign key are not converted; the plan is blocked and says why.
+A type change that is not one of the widenings below blocks the plan unless the column is listed under conversions, by its target name. A listed conversion becomes convert_column_type: ALTER COLUMN ... TYPE with USING column::type, so PostgreSQL converts each stored value. It rewrites the table and its indexes under an exclusive lock, and the migration rolls back if any value does not convert (text 'x' to integer fails with 22P02). Only conversions whose result depends on the stored value alone are planned:
+
+| From | To |
+| --- | --- |
+| integer types | integer types, numeric, text, varchar without a length |
+| numeric | integer types, numeric, text, varchar without a length |
+| real, double precision | integer types, numeric; real to double precision |
+| text, varchar, char | each other, integer types, numeric, boolean, uuid |
+| boolean | integer, text, varchar without a length |
+| uuid, jsonb | text, varchar without a length |
+| date | timestamp without time zone |
+
+Everything else is blocked with a reason: conversions that depend on session settings (dates and timestamps to or from text, timestamps with and without time zone, bytea, real and double precision to text), that lose information without failing (to real or double precision, except real to double precision), or that reinterpret values (integer to boolean, text to jsonb). The explanation notes rounding: numeric, real or double precision to an integer rounds fractions, and a numeric with a smaller scale rounds to that scale. Between text types there is no USING clause, so a value longer than a new varchar(n) or char(n) length makes the conversion fail (22001) instead of being cut short; converting another type family to a length-limited text type is blocked for the same reason. A default is dropped before the conversion and the target's default set after it. Identity columns, columns in a check constraint that stays, and columns in a foreign key are not converted; the plan is blocked and says why.
 
 ## Staged changes
 
@@ -92,7 +104,7 @@ Still blocked: dropping tables, columns, indexes, unique constraints, foreign ke
 
 ## Online plans
 
-`forgeschema plan --online` builds indexes on existing tables with CREATE INDEX CONCURRENTLY, so reads and writes keep going while a large table is indexed. A new unique constraint on an existing table is built the same way, as a unique index, and then attached with ADD CONSTRAINT ... UNIQUE USING INDEX, which takes a brief lock. Indexes on tables the plan creates are built with the table, as before. Plans without such indexes come out the same with or without the flag.
+`forgeschema plan --online` builds indexes on existing tables with CREATE INDEX CONCURRENTLY, so reads and writes keep going while a large table is indexed. A new unique constraint on an existing table is built the same way, as a unique index, and then attached with ADD CONSTRAINT ... UNIQUE USING INDEX, which takes a brief lock. Indexes on tables the plan creates are built with the table, as before. Plans without such indexes get the same operations with or without the flag, but the artifact records online: true, so its JSON and plan ID differ.
 
 An online plan runs in three phases, and --explain says so:
 

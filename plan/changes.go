@@ -293,16 +293,51 @@ func dropOperations(src schema.Document, drops []Drop, block func(object, reason
 	}
 	alter := func(table string) string { return "ALTER TABLE " + qualified(src.Schema, table) }
 	var ops []Operation
-	// Foreign keys between dropped tables go with their tables, but are
-	// removed explicitly first.
+	// A dropped table's foreign keys would go with it, but they are removed
+	// first, so that the keys and columns they reference can be dropped
+	// before the table, and the tables in any order.
 	for _, t := range src.Tables {
 		if !droppedTables[t.Name] {
 			continue
 		}
 		for _, fk := range t.ForeignKeys {
-			if droppedTables[fk.References.Table] && fk.References.Table != t.Name {
-				ops = append(ops, Operation{Kind: "drop_foreign_key", Table: t.Name, Subject: fk.Name, SQL: alter(t.Name) + " DROP CONSTRAINT " + quote(fk.Name) + ";", Explanation: "Remove foreign key " + fk.Name + " between two tables this plan drops, so they can be dropped in any order."})
+			if fk.References.Table != t.Name {
+				ops = append(ops, Operation{Kind: "drop_foreign_key", Table: t.Name, Subject: fk.Name, SQL: alter(t.Name) + " DROP CONSTRAINT " + quote(fk.Name) + ";", Explanation: "Remove foreign key " + fk.Name + " of table " + t.Name + ", which this plan drops, before the other drops."})
 			}
+		}
+	}
+	// PostgreSQL ties a foreign key to one unique index of the referenced
+	// columns, and the schema model does not record which, so no unique
+	// constraint or unique index a kept foreign key could be using is dropped.
+	keptReference := func(table string, cols []string) string {
+		for _, t := range src.Tables {
+			if droppedTables[t.Name] {
+				continue
+			}
+			for _, fk := range t.ForeignKeys {
+				if fk.References.Table == table && !droppedObjects["foreign_key\x00"+t.Name+"\x00"+fk.Name] && sameSet(fk.References.Columns, cols) {
+					return fk.Name
+				}
+			}
+		}
+		return ""
+	}
+	for _, d := range drops {
+		kind, name, _ := d.kind()
+		var cols []string
+		switch kind {
+		case "unique":
+			cols = uniques(sm[d.Table])[name].Columns
+		case "index":
+			if x := indexes(sm[d.Table])[name]; x.Unique {
+				cols = x.Columns
+			}
+		}
+		if cols == nil {
+			continue
+		}
+		if fk := keptReference(d.Table, cols); fk != "" {
+			block(d.Table+" "+strings.ReplaceAll(kind, "_", " ")+" "+name, "foreign key "+fk+" references these columns and may depend on this key; drop the foreign key too, or keep the key")
 		}
 	}
 	for _, d := range drops {
@@ -384,11 +419,11 @@ func dropOperations(src schema.Document, drops []Drop, block func(object, reason
 // convertOperation returns the SQL and explanation for a listed type
 // conversion, or a reason it is blocked.
 func convertOperation(alterTable string, from, to schema.Column) (Operation, string) {
-	switch {
-	case from.Identity != "":
+	if from.Identity != "" {
 		return Operation{}, "converting an identity column is unsupported; its sequence keeps the old type"
-	case schema.TypeLength(to.Type) > 0 && !schema.TextType(from.Type):
-		return Operation{}, "converting to a length-limited text type from another type family would truncate values silently; convert to text or varchar first"
+	}
+	if reason := conversionAllowed(from.Type, to.Type); reason != "" {
+		return Operation{}, reason
 	}
 	sql := alterTable + " ALTER COLUMN " + quote(to.Name) + " TYPE " + to.Type
 	explanation := "Convert " + to.Name + " from " + from.Type + " to " + to.Type + ". PostgreSQL rewrites the table and rebuilds its indexes under an exclusive lock; the migration fails and rolls back if any value does not convert."
@@ -444,4 +479,67 @@ func conversionBlocker(table, column string, working, target schema.Table, worki
 		}
 	}
 	return ""
+}
+
+func sameSet(a, b []string) bool {
+	x, y := append([]string{}, a...), append([]string{}, b...)
+	sort.Strings(x)
+	sort.Strings(y)
+	return strings.Join(x, "\x00") == strings.Join(y, "\x00")
+}
+
+// family groups the supported types for conversions.
+func family(t string) string {
+	switch {
+	case schema.IntegerType(t):
+		return "integer"
+	case strings.HasPrefix(t, "numeric"):
+		return "numeric"
+	case t == "real" || t == "double precision":
+		return "float"
+	case schema.TextType(t):
+		return "text"
+	case t == "timestamp with time zone" || t == "timestamp without time zone":
+		return "timestamp"
+	}
+	return t
+}
+
+// conversionAllowed returns why a conversion is not planned, or "". Only
+// conversions whose result is fixed by the stored value are allowed; ones
+// that depend on session settings (time zone, date style, bytea output),
+// lose information without failing, or reinterpret values (integer to
+// boolean, text to jsonb) are blocked.
+func conversionAllowed(from, to string) string {
+	f, t := family(from), family(to)
+	switch {
+	case schema.TypeLength(to) > 0 && f != "text":
+		return "converting to a length-limited text type from another type family would cut values short silently; convert to text or varchar first"
+	case t == "float" && !(from == "real" && to == "double precision"):
+		return "converting to " + to + " can lose precision silently; only real to double precision is planned"
+	case f == "date" || f == "timestamp":
+		if from == "date" && to == "timestamp without time zone" {
+			return ""
+		}
+		return "converting from " + from + " depends on the session time zone or date style; only date to timestamp without time zone is planned"
+	case t == "date" || t == "timestamp":
+		return "converting to " + to + " depends on the session time zone or date style"
+	case f == "bytea" || t == "bytea":
+		return "converting bytea depends on the session's bytea settings"
+	case t == "jsonb" || f == "jsonb" && t != "text":
+		return "converting to or from jsonb other than jsonb to text is unsupported; PostgreSQL normalizes JSON text"
+	case t == "boolean" && f != "text":
+		return "converting " + from + " to boolean turns every nonzero value into true"
+	case f == "boolean" && t == "integer" && to != "integer":
+		return "boolean converts to integer only"
+	case t == "uuid" && f != "text":
+		return "only text converts to uuid"
+	}
+	switch f + ">" + t {
+	case "integer>integer", "integer>numeric", "numeric>integer", "numeric>numeric", "float>integer", "float>numeric", "float>float",
+		"text>text", "text>integer", "text>numeric", "text>boolean", "text>uuid",
+		"integer>text", "numeric>text", "boolean>text", "uuid>text", "jsonb>text", "boolean>integer":
+		return ""
+	}
+	return "converting " + from + " to " + to + " is unsupported"
 }

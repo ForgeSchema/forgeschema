@@ -176,10 +176,13 @@ func TestOnlineBuildDoesNotBlockWriters(t *testing.T) {
 	// The build waits for the open writer, so commit it shortly after.
 	done := make(chan error, 1)
 	go func() {
-		_, err := postgres.Apply(context.Background(), db, p, postgres.ApplyOptions{})
+		// The build's wait for the writer outlasts lock_timeout, which does
+		// not apply to it.
+		_, err := postgres.Apply(context.Background(), db, p, postgres.ApplyOptions{LockTimeout: 100 * time.Millisecond})
 		done <- err
 	}()
 	waitForBuild(t, db)
+	time.Sleep(500 * time.Millisecond)
 	if err = writer.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -204,4 +207,44 @@ func waitForBuild(t *testing.T, db *sql.DB) {
 		time.Sleep(25 * time.Millisecond)
 	}
 	t.Fatal("index build never started")
+}
+
+// Another apply waiting for the coordination lock must not hold a snapshot,
+// or the concurrent build waits for it while it waits for the build.
+func TestOnlineBuildAndWaitingApplyDoNotDeadlock(t *testing.T) {
+	db := database(t)
+	name := shopDatabase(t, db)
+	_, other := applyFixture(t, db)
+	p := onlinePlan(t, db, name, func(d *schema.Document) {
+		o := table(d, "orders")
+		o.Indexes = append(o.Indexes, schema.Index{Name: "orders_total_idx", Columns: []string{"total"}})
+	})
+	writer, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Rollback()
+	if _, err = writer.Exec("INSERT INTO " + name + ".orders(customer_id,total) VALUES (1, 5)"); err != nil {
+		t.Fatal(err)
+	}
+	online, plain := make(chan error, 1), make(chan error, 1)
+	go func() {
+		_, err := postgres.Apply(context.Background(), db, p, postgres.ApplyOptions{})
+		online <- err
+	}()
+	waitForBuild(t, db)
+	go func() {
+		_, err := postgres.Apply(context.Background(), db, other, postgres.ApplyOptions{LockTimeout: 20 * time.Second, Timeout: 30 * time.Second})
+		plain <- err
+	}()
+	time.Sleep(300 * time.Millisecond)
+	if err = writer.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err = <-online; err != nil {
+		t.Fatalf("online apply: %v", err)
+	}
+	if err = <-plain; err != nil {
+		t.Fatalf("waiting apply: %v", err)
+	}
 }

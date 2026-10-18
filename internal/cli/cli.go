@@ -157,6 +157,9 @@ func Run(args []string, out, errs io.Writer) int {
 			}
 			var drift *postgres.DriftError
 			if errors.As(err, &drift) {
+				if drift.Phase == "final" {
+					return fail(errs, drift.Error()+"; the first phase of this online plan is committed, but the schema changed before the final phase, so nothing more was applied. Inspect the schema before deciding what to do", 5)
+				}
 				if drift.Phase == "target" {
 					return fail(errs, drift.Error()+"; the result did not match the reviewed target, so nothing was committed. Check for concurrent DDL, then inspect again", 5)
 				}
@@ -309,6 +312,9 @@ func detail(err error) string {
 			return ""
 		}
 		return ": " + pqErr.Message + " [SQLSTATE " + string(pqErr.Code) + "]"
+	}
+	if errors.Is(err, postgres.ErrCoordinationBusy) {
+		return ": " + err.Error()
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		return ": timed out"
