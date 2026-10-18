@@ -242,6 +242,9 @@ func TestApplyConstraintsOnPopulatedTables(t *testing.T) {
 func TestApplyLocksOnlyChangedTables(t *testing.T) {
 	db := database(t)
 	name := shopDatabase(t, db)
+	// Reading a check expression opens its table (see INSPECTION.md), so
+	// the busy table here has none.
+	exec(t, db, "ALTER TABLE "+name+".order_lines DROP CONSTRAINT order_lines_quantity_check, DROP CONSTRAINT order_lines_sku_check")
 	p := shopChange(t, db, name, func(d *schema.Document) {
 		c := table(d, "customers")
 		c.Columns = append(c.Columns, schema.Column{Name: "nickname", Type: "text", Nullable: true})

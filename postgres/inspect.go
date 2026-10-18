@@ -183,7 +183,7 @@ func readTablesScan(ctx context.Context, tx *sql.Tx, oid int64, name string, ix 
 		if table.Columns, err = readColumns(ctx, tx, oid, info.oid, object, info.name); err != nil {
 			return doc, err
 		}
-		if table.PrimaryKey, table.Unique, table.ForeignKeys, err = readConstraints(ctx, tx, oid, info.oid, object, info.name); err != nil {
+		if table.PrimaryKey, table.Unique, table.ForeignKeys, table.Checks, err = readConstraints(ctx, tx, oid, info.oid, object, info.name, table.Columns); err != nil {
 			return doc, err
 		}
 		if table.Indexes, err = readIndexes(ctx, tx, info.oid, object, ix); err != nil {
@@ -258,43 +258,49 @@ func readColumns(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, tabl
 
 var actionCodes = map[string]string{"a": "", "r": "restrict", "c": "cascade", "n": "set_null", "d": "set_default"}
 
-func readConstraints(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, table string) ([]string, []schema.Unique, []schema.ForeignKey, error) {
+func readConstraints(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, table string, columns []schema.Column) ([]string, []schema.Unique, []schema.ForeignKey, []schema.Check, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT c.conname,c.contype::text,
- c.condeferrable OR c.condeferred OR NOT c.convalidated OR NOT c.conislocal OR c.coninhcount<>0
+ c.condeferrable OR c.condeferred OR NOT c.convalidated OR NOT c.conislocal OR c.coninhcount<>0 OR (c.contype='c' AND c.connoinherit)
  OR (c.contype='f' AND (c.confmatchtype<>'s' OR c.confdelsetcols IS NOT NULL OR r.relnamespace<>$2)),
  COALESCE((SELECT json_agg(a.attname ORDER BY k.n)::text FROM unnest(c.conkey) WITH ORDINALITY k(attnum,n)
  JOIN pg_catalog.pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum),'[]'),
  COALESCE(r.relname::text,''),
  COALESCE((SELECT json_agg(a.attname ORDER BY k.n)::text FROM unnest(c.confkey) WITH ORDINALITY k(attnum,n)
  JOIN pg_catalog.pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.attnum),'[]'),
- c.confdeltype::text,c.confupdtype::text
+ c.confdeltype::text,c.confupdtype::text,
+ CASE WHEN c.contype='c' THEN pg_catalog.pg_get_constraintdef(c.oid) ELSE '' END
  FROM pg_catalog.pg_constraint c LEFT JOIN pg_catalog.pg_class r ON r.oid=c.confrelid
  WHERE c.conrelid=$1 ORDER BY c.conname`, oid, nsoid)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	defer rows.Close()
+	cols := map[string]schema.Column{}
+	for _, c := range columns {
+		cols[c.Name] = c
+	}
+	var checks []schema.Check
 	var pk []string
 	var uniques []schema.Unique
 	var fks []schema.ForeignKey
 	for rows.Next() {
-		var cname, kind, cols, refTable, refCols, onDelete, onUpdate string
+		var cname, kind, keys, refTable, refCols, onDelete, onUpdate, definition string
 		var special bool
-		if err = rows.Scan(&cname, &kind, &special, &cols, &refTable, &refCols, &onDelete, &onUpdate); err != nil {
-			return nil, nil, nil, err
+		if err = rows.Scan(&cname, &kind, &special, &keys, &refTable, &refCols, &onDelete, &onUpdate, &definition); err != nil {
+			return nil, nil, nil, nil, err
 		}
 		label := object + " constraint " + cname
 		if special {
-			return nil, nil, nil, unsupported(label, "deferrable, unvalidated, inherited, cross-schema, MATCH FULL or column-list SET NULL constraints are not represented")
+			return nil, nil, nil, nil, unsupported(label, "deferrable, unvalidated, inherited, NO INHERIT, cross-schema, MATCH FULL or column-list SET NULL constraints are not represented")
 		}
 		var names []string
-		if err = json.Unmarshal([]byte(cols), &names); err != nil {
-			return nil, nil, nil, err
+		if err = json.Unmarshal([]byte(keys), &names); err != nil {
+			return nil, nil, nil, nil, err
 		}
 		switch kind {
 		case "p":
 			if cname != table+"_pkey" {
-				return nil, nil, nil, unsupported(label, "primary keys must use the TABLE_pkey name")
+				return nil, nil, nil, nil, unsupported(label, "primary keys must use the TABLE_pkey name")
 			}
 			pk = names
 		case "u":
@@ -302,20 +308,26 @@ func readConstraints(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, 
 		case "f":
 			fk := schema.ForeignKey{Name: cname, Columns: names, References: schema.Reference{Table: refTable}}
 			if err = json.Unmarshal([]byte(refCols), &fk.References.Columns); err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			var ok1, ok2 bool
 			fk.OnDelete, ok1 = actionCodes[onDelete]
 			fk.OnUpdate, ok2 = actionCodes[onUpdate]
 			if !ok1 || !ok2 {
-				return nil, nil, nil, unsupported(label, "unknown referential action")
+				return nil, nil, nil, nil, unsupported(label, "unknown referential action")
 			}
 			fks = append(fks, fk)
+		case "c":
+			expr, ok := schema.CheckFromCatalog(cols, definition)
+			if !ok {
+				return nil, nil, nil, nil, unsupported(label, "check expressions outside the supported grammar are not represented")
+			}
+			checks = append(checks, schema.Check{Name: cname, Expression: expr})
 		default:
-			return nil, nil, nil, unsupported(label, "check, exclusion and trigger constraints are not represented")
+			return nil, nil, nil, nil, unsupported(label, "exclusion and trigger constraints are not represented")
 		}
 	}
-	return pk, uniques, fks, rows.Err()
+	return pk, uniques, fks, checks, rows.Err()
 }
 func readIndexes(ctx context.Context, tx *sql.Tx, oid int64, object string, ix *indexScan) ([]schema.Index, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT ic.relname,

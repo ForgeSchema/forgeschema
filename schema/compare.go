@@ -148,6 +148,26 @@ func Compare(expected, actual Document) ([]Difference, error) {
 				add(Difference{Kind: "foreign_key_unexpected", Table: t.Name, Constraint: fk.Name, Expected: "absent", Actual: ForeignKeyDefinition(fk)})
 			}
 		}
+		ek, ak := map[string]Check{}, map[string]Check{}
+		for _, c := range t.Checks {
+			ek[c.Name] = c
+		}
+		for _, c := range live.Checks {
+			ak[c.Name] = c
+		}
+		for _, c := range t.Checks {
+			observed, ok := ak[c.Name]
+			if !ok {
+				add(Difference{Kind: "check_missing", Table: t.Name, Constraint: c.Name, Expected: c.Expression, Actual: "absent"})
+			} else if c.Expression != observed.Expression {
+				add(Difference{Kind: "check_definition", Table: t.Name, Constraint: c.Name, Expected: c.Expression, Actual: observed.Expression})
+			}
+		}
+		for _, c := range live.Checks {
+			if _, ok := ek[c.Name]; !ok {
+				add(Difference{Kind: "check_unexpected", Table: t.Name, Constraint: c.Name, Expected: "absent", Actual: c.Expression})
+			}
+		}
 	}
 	for _, t := range a.Tables {
 		if _, ok := em[t.Name]; !ok {

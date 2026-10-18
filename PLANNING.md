@@ -27,20 +27,23 @@ The Go API is plan.Build(source, target, renames). Plan.Validate reconstructs th
 
 ## Supported operations and order
 
-Plans run in six phases. Within each phase, normalized table/name order or sorted explicit rename order makes output deterministic.
+Plans run in seven phases. Within each phase, normalized table/name order or sorted explicit rename order makes output deterministic.
 
-1. create_table: new tables with their columns (types, defaults, identity, nullability), primary key and unique constraints.
+1. create_table: new tables with their columns (types, defaults, identity, nullability), primary key, unique constraints and check constraints.
 2. rename_column: explicit renames.
 3. add_column: new columns on existing tables. A column needs to be nullable or have a default. A constant or now()-style default is stored once, so existing rows get it without a rewrite; now(), current_timestamp and similar give every existing row the time of the migration. gen_random_uuid() is evaluated per row, so PostgreSQL rewrites the table; the explanation says so.
 4. Column changes on existing tables: alter_column_type for widening only (longer or unbounded varchar, varchar to text, more numeric precision at the same scale, numeric(p,s) to numeric); set_not_null, which scans the table and fails if any row is NULL; drop_not_null; set_default and drop_default, which affect future inserts only.
-5. add_unique and create_index: unique constraints and plain or unique indexes on new and existing tables. Building over existing rows fails if they contain duplicates.
-6. add_foreign_key: every new foreign key, after all tables, columns and referenced unique keys exist. On an existing table PostgreSQL checks every row and fails if any has no match.
+5. add_check: new check constraints on existing tables, after the column changes they may depend on. PostgreSQL checks every existing row under an exclusive lock and fails if any row violates the constraint (SQLSTATE 23514).
+6. add_unique and create_index: unique constraints and plain or unique indexes on new and existing tables. Building over existing rows fails if they contain duplicates.
+7. add_foreign_key: every new foreign key, after all tables, columns and referenced unique keys exist. On an existing table PostgreSQL checks every row and fails if any has no match.
 
 Any step that fails against real data (duplicates, NULLs, orphan rows) makes the whole transaction roll back; apply reports PostgreSQL's reason and SQLSTATE.
 
 Every schema, table, column, constraint and index identifier is quoted. Types and defaults come only from the normalized schema whitelist, not arbitrary SQL input. A plain plan builds indexes with ordinary CREATE INDEX, which blocks writes to the table while it runs; see Online plans below for building them concurrently. ALTER TABLE operations require table locks; --explain lists the tables apply will lock. Planning does not estimate lock duration or inspect row counts.
 
-Still blocked: dropping or implicitly renaming tables, columns, indexes, unique constraints or foreign keys; type conversions other than the widening above; adding a required column without a default; adding an identity column to an existing table, or adding, removing or changing identity on an existing column; renaming an identity column; altering a primary key; and changing an index, unique constraint or foreign key definition. Required columns are allowed on a newly created empty table. Target normalization rejects relation-name collisions before a plan is generated; since ready plans remove no relations, existing names cannot be silently recycled.
+A column rename carries the check constraints that use it along, as PostgreSQL does; the target lists them with the new name.
+
+Still blocked: dropping or implicitly renaming tables, columns, indexes, unique constraints, foreign keys or check constraints; type conversions other than the widening above; adding a required column without a default; adding an identity column to an existing table, or adding, removing or changing identity on an existing column; renaming an identity column; altering a primary key; and changing an index, unique constraint, foreign key or check constraint definition. Required columns are allowed on a newly created empty table. Target normalization rejects relation-name collisions before a plan is generated; since ready plans remove no relations, existing names cannot be silently recycled.
 
 ## Online plans
 

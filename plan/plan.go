@@ -263,6 +263,9 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 	}
 	for ti := range working.Tables {
 		t := &working.Tables[ti]
+		for i := range t.Checks {
+			t.Checks[i].Expression = schema.RenameCheckColumns(columns(sm[t.Name]), t.Checks[i].Expression, mappings[t.Name])
+		}
 		for ci := range t.Columns {
 			if n, ok := mappings[t.Name][t.Columns[ci].Name]; ok {
 				t.Columns[ci].Name = n
@@ -288,7 +291,7 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 	if p.TargetFingerprint, err = dst.Fingerprint(); err != nil {
 		return Plan{}, err
 	}
-	var createOps, renameOps, addOps, alterOps, indexOps, concurrentOps, attachOps, foreignKeyOps []Operation
+	var createOps, renameOps, addOps, alterOps, checkOps, indexOps, concurrentOps, attachOps, foreignKeyOps []Operation
 	block := func(object, reason string) { p.Blocked = append(p.Blocked, Blocker{object, reason}) }
 	alter := func(table string) string { return "ALTER TABLE " + qualified(dst.Schema, table) }
 	for _, r := range hints {
@@ -353,10 +356,16 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 			for _, u := range tt.Unique {
 				definitions = append(definitions, "CONSTRAINT "+quote(u.Name)+" UNIQUE ("+names(u.Columns)+")")
 			}
+			for _, c := range tt.Checks {
+				definitions = append(definitions, "CONSTRAINT "+quote(c.Name)+" CHECK ("+schema.CheckSQL(columns(tt), c.Expression)+")")
+			}
 			// Keep the 0.1 wording for tables 0.1 could plan, so saved plans stay valid.
 			explanation := "Create a new table with its declared columns and primary key; indexes follow separately."
 			if len(tt.Unique) > 0 || len(tt.ForeignKeys) > 0 {
 				explanation = "Create a new table with its declared columns, primary key and unique constraints; indexes and foreign keys follow separately."
+			}
+			if len(tt.Checks) > 0 {
+				explanation = "Create a new table with its declared columns, primary key, unique and check constraints; indexes and foreign keys follow separately."
 			}
 			createOps = append(createOps, Operation{Kind: "create_table", Table: tt.Name, SQL: "CREATE TABLE " + qualified(dst.Schema, tt.Name) + " (" + strings.Join(definitions, ", ") + ");", Explanation: explanation})
 			addIndexes(tt, nil, true)
@@ -462,6 +471,25 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 			}
 		}
 		addForeignKeys(tt, foreignKeys(st), false)
+		targetChecks, sourceChecks := map[string]schema.Check{}, map[string]schema.Check{}
+		for _, c := range tt.Checks {
+			targetChecks[c.Name] = c
+		}
+		for _, c := range st.Checks {
+			sourceChecks[c.Name] = c
+			want, ok := targetChecks[c.Name]
+			if !ok {
+				block(tt.Name+" check "+c.Name, "dropping or renaming a check constraint is unsupported")
+			} else if want.Expression != c.Expression {
+				block(tt.Name+" check "+c.Name, "changing a check constraint is unsupported")
+			}
+		}
+		for _, c := range tt.Checks {
+			if _, ok := sourceChecks[c.Name]; ok {
+				continue
+			}
+			checkOps = append(checkOps, Operation{Kind: "add_check", Table: tt.Name, Subject: c.Name, SQL: alter(tt.Name) + " ADD CONSTRAINT " + quote(c.Name) + " CHECK (" + schema.CheckSQL(columns(tt), c.Expression) + ");", Explanation: "Add a check constraint (" + c.Expression + "). PostgreSQL checks every existing row under an exclusive lock; the migration fails and rolls back if any row violates it."})
+		}
 	}
 	for _, r := range hints {
 		renameOps = append(renameOps, Operation{Kind: "rename_column", Table: r.Table, Subject: r.From, SQL: alter(r.Table) + " RENAME COLUMN " + quote(r.From) + " TO " + quote(r.To) + ";", Explanation: "Explicitly rename " + r.From + " to " + r.To + "; PostgreSQL retains column data and updates existing key/index references. Requires a table lock."})
@@ -480,7 +508,7 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 	// Concurrent builds come after every transactional change they may
 	// depend on, and attaching constraints and adding foreign keys after
 	// them, so apply can split an online plan into three phases.
-	for _, phase := range [][]Operation{createOps, renameOps, addOps, alterOps, indexOps, concurrentOps, attachOps, foreignKeyOps} {
+	for _, phase := range [][]Operation{createOps, renameOps, addOps, alterOps, checkOps, indexOps, concurrentOps, attachOps, foreignKeyOps} {
 		p.Operations = append(p.Operations, phase...)
 	}
 	return p, nil

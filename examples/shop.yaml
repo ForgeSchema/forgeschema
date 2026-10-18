@@ -21,6 +21,9 @@ tables:
   unique:
   - name: customers_email_key
     columns: [email]
+  checks:
+  - name: customers_status_check
+    expression: status IN ('active', 'closed')
 - name: orders
   columns:
   - name: id
@@ -51,6 +54,9 @@ tables:
       table: customers
       columns: [id]
     on_delete: restrict
+  checks:
+  - name: orders_total_check
+    expression: total >= 0
 - name: order_lines
   columns:
   - name: order_id
@@ -74,3 +80,8 @@ tables:
       table: orders
       columns: [id]
     on_delete: cascade
+  checks:
+  - name: order_lines_quantity_check
+    expression: quantity > 0
+  - name: order_lines_sku_check
+    expression: char_length(sku) = 12

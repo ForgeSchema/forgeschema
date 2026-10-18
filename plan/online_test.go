@@ -111,3 +111,44 @@ func TestPlainPlanUnchangedByOnlineOption(t *testing.T) {
 		t.Fatal("tampered online flag accepted")
 	}
 }
+
+func TestCheckPlans(t *testing.T) {
+	src := doc(t, base)
+	dst := doc(t, base)
+	c := &dst.Tables[0]
+	c.Checks = []schema.Check{{Name: "customers_id_check", Expression: "id > 0"}}
+	dst.Tables = append(dst.Tables, schema.Table{Name: "tags", Columns: []schema.Column{{Name: "label", Type: "text"}},
+		Checks: []schema.Check{{Name: "tags_label_check", Expression: "char_length(label) > 0"}}})
+	p, err := Build(src, dst, nil)
+	if err != nil || p.Status != "ready" {
+		t.Fatalf("%+v %v", p.Blocked, err)
+	}
+	var sqls []string
+	for _, op := range p.Operations {
+		sqls = append(sqls, op.Kind+": "+op.SQL)
+	}
+	joined := strings.Join(sqls, "\n")
+	for _, want := range []string{
+		`create_table: CREATE TABLE "public"."tags" ("label" text NOT NULL, CONSTRAINT "tags_label_check" CHECK (char_length("label") > 0));`,
+		`add_check: ALTER TABLE "public"."customers" ADD CONSTRAINT "customers_id_check" CHECK ("id" > 0);`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("missing %s in\n%s", want, joined)
+		}
+	}
+	// A rename carries the check along; dropping or changing it is blocked.
+	renamed := doc(t, strings.Replace(base, "name: customer_name", "name: full_name", 1))
+	src.Tables[0].Checks = []schema.Check{{Name: "customers_name_check", Expression: "customer_name <> ''"}}
+	renamed.Tables[0].Checks = []schema.Check{{Name: "customers_name_check", Expression: "full_name <> ''"}}
+	if p, err = Build(src, renamed, []Rename{{Table: "customers", From: "customer_name", To: "full_name"}}); err != nil || p.Status != "ready" {
+		t.Fatalf("rename: %+v %v", p.Blocked, err)
+	}
+	renamed.Tables[0].Checks[0].Expression = "full_name <> 'x'"
+	if p, _ = Build(src, renamed, []Rename{{Table: "customers", From: "customer_name", To: "full_name"}}); p.Status != "blocked" {
+		t.Fatal("changed check not blocked")
+	}
+	renamed.Tables[0].Checks = nil
+	if p, _ = Build(src, renamed, []Rename{{Table: "customers", From: "customer_name", To: "full_name"}}); p.Status != "blocked" {
+		t.Fatal("dropped check not blocked")
+	}
+}

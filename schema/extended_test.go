@@ -94,6 +94,8 @@ func TestDefaultFromCatalog(t *testing.T) {
 		{"timestamp without time zone", "LOCALTIMESTAMP", "localtimestamp"}, {"date", "CURRENT_DATE", "current_date"},
 		{"uuid", "gen_random_uuid()", "gen_random_uuid()"}, {"jsonb", "'{}'::jsonb", "'{}'"}, {"smallint", "'-1'::integer", "-1"},
 		{"real", "'3000000000'::bigint", "3000000000"}, {"numeric(5,2)", "'-1'::integer", "-1"},
+		// A varchar column widened to text keeps the varchar cast on its default.
+		{"text", "'x'::character varying", "'x'"},
 	}
 	for _, c := range cases {
 		if got, ok := DefaultFromCatalog(c.typ, c.expr); !ok || got != c.want {
@@ -105,7 +107,7 @@ func TestDefaultFromCatalog(t *testing.T) {
 		{"text", "lower('X'::text)"}, {"jsonb", `'{"a": 1}'::jsonb`}, {"timestamp with time zone", "'2024-01-01 00:00:00+00'::timestamp with time zone"},
 		// Casts that change the stored value must not be stripped.
 		{"text", "'ab '::bpchar"}, {"double precision", "'0.1'::real"}, {"numeric(10,4)", "'1.1'::real"}, {"real", "(0.1)::real"},
-		{"text", "'a\\b'::text"}, {"integer", "5::bigint"}, {"text", "'x'::character varying"},
+		{"text", "'a\\b'::text"}, {"integer", "5::bigint"},
 	} {
 		if got, ok := DefaultFromCatalog(c.typ, c.expr); ok {
 			t.Errorf("%s %q accepted as %q", c.typ, c.expr, got)

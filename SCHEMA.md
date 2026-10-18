@@ -1,6 +1,6 @@
 # Schema contract, version 1
 
-A document contains required version: 1, a schema name and a tables sequence. Use tables: [] for an empty managed schema. A table has a name, a nonempty columns sequence and optional primary_key, unique, indexes and foreign_keys. [examples/shop.yaml](examples/shop.yaml) uses every part of the contract.
+A document contains required version: 1, a schema name and a tables sequence. Use tables: [] for an empty managed schema. A table has a name, a nonempty columns sequence and optional primary_key, unique, indexes, foreign_keys and checks. [examples/shop.yaml](examples/shop.yaml) uses every part of the contract.
 
 Names are lower-case ASCII letters, digits and underscores; they must start with a letter or underscore and fit PostgreSQL's 63-byte limit. Names beginning pg_ or forgeschema_ and information_schema are reserved. The inspector uses the same naming policy; identifiers outside it are unsupported, not silently renamed. At most 1600 columns per table and 32 columns per key, constraint or index are accepted.
 
@@ -38,7 +38,23 @@ indexes is a sequence of named btree indexes with ordered columns and optional u
 
 foreign_keys is a sequence of named constraints with columns, references (table and columns in the same schema) and optional on_delete and on_update: no_action (the default), restrict, cascade, set_null or set_default. The referenced columns, in any order, must be the referenced table's primary key, a unique constraint or a unique index. Paired columns must have the same type or belong to the same family: integers, varchar/text, char or numeric (any precision). set_null needs nullable columns. Self-references are allowed.
 
-Primary key, unique constraint, index and identity sequence names share PostgreSQL's per-schema relation namespace and must not collide with each other or with tables. Foreign key names must be unique within their table and differ from its primary key and unique constraint names.
+checks is a sequence of named CHECK constraints, each with an expression in a small grammar that PostgreSQL stores and prints back in a form ForgeSchema can read exactly:
+
+```yaml
+checks:
+- name: orders_total_check
+  expression: total >= 0
+- name: customers_status_check
+  expression: status IN ('active', 'closed')
+- name: order_lines_sku_check
+  expression: char_length(sku) = 12 AND quantity > 0
+```
+
+An expression is one or more terms joined by AND. A term compares a column, or char_length() of a text, varchar or char column, with a literal (`total >= 0`), with a list (`status IN ('active', 'closed')`) or with another column of the same type family (`ends_on >= starts_on`). Operators are =, <>, <, <=, > and >=; != is read as <>. Literals follow the default rules above for the column's type: integer and numeric columns take number literals that fit the column, text, varchar and char columns take quoted strings, boolean columns take true or false, and char_length() takes integers. Two columns may be compared when both are integers, numerics, text/varchar, char, boolean, date, timestamps, uuid, real or double precision of the same family. OR, NOT, IS NULL, functions other than char_length, casts, and literals for date, timestamp, real, double precision, uuid, jsonb and bytea columns are not part of the grammar. Use nullable: false rather than IS NOT NULL.
+
+The canonical spelling puts single spaces around operators, writes AND and IN in capitals, keeps column names bare (quoting only and, in, any, array, true and false), and writes a one-value IN list as =, which is how PostgreSQL stores it. Keywords are case-insensitive; column names are lower case.
+
+Primary key, unique constraint, index and identity sequence names share PostgreSQL's per-schema relation namespace and must not collide with each other or with tables. Foreign key and check names must be unique within their table and differ from its primary key and unique constraint names.
 
 ## Strict reading and canonical form
 
@@ -46,4 +62,4 @@ The YAML reader rejects unknown and duplicate fields, null values, multiple docu
 
 Explicit rename intent is supplied through the separate versioned mapping file described in PLANNING.md; schema files themselves have no rename field. Read-only PostgreSQL 16/17 inspection maps supported catalog objects to this contract and rejects unsupported structures; see INSPECTION.md. Offline SQL generation is available through the planner. Supported reviewed plans can be executed transactionally through apply; see APPLY.md.
 
-Not represented: generated columns, timestamp/time precision, arrays, enums, domains, custom collations, check and exclusion constraints, deferrable constraints, cross-schema foreign keys, MATCH FULL, partial, expression, INCLUDE and non-btree indexes, and index options.
+Not represented: generated columns, timestamp/time precision, arrays, enums, domains, custom collations, check constraints outside the grammar above, exclusion constraints, deferrable constraints, cross-schema foreign keys, MATCH FULL, partial, expression, INCLUDE and non-btree indexes, and index options.

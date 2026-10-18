@@ -29,6 +29,7 @@ type Table struct {
 	Unique      []Unique     `yaml:"unique,omitempty" json:"unique,omitempty"`
 	Indexes     []Index      `yaml:"indexes,omitempty" json:"indexes,omitempty"`
 	ForeignKeys []ForeignKey `yaml:"foreign_keys,omitempty" json:"foreign_keys,omitempty"`
+	Checks      []Check      `yaml:"checks,omitempty" json:"checks,omitempty"`
 }
 type Column struct {
 	Name     string `yaml:"name" json:"name"`
@@ -280,7 +281,8 @@ var catalogCast = regexp.MustCompile(`^(.*)::(integer|bigint|numeric|text|charac
 
 // impliedCast reports the casts PostgreSQL adds to a supported default on its
 // own, which do not change the value: integer/bigint/numeric around number
-// literals and the column's own text type around string literals. Any other
+// literals, the column's own text type around string literals, and varchar
+// on a text column. Any other
 // cast (say 'ab '::bpchar on a text column, or '0.1'::real on double
 // precision) changes the stored value and is not stripped.
 func impliedCast(typ, cast string) bool {
@@ -288,7 +290,8 @@ func impliedCast(typ, cast string) bool {
 	case numberType(typ):
 		return cast == "integer" || cast == "bigint" || cast == "numeric"
 	case typ == "text":
-		return cast == "text"
+		// A varchar column widened to text keeps its default's varchar cast.
+		return cast == "text" || cast == "character varying"
 	case strings.HasPrefix(typ, "character varying"):
 		return cast == "character varying"
 	case strings.HasPrefix(typ, "character("):
@@ -508,6 +511,16 @@ func Normalize(in Document) (Document, error) {
 				}
 			}
 		}
+		for ci := range t.Checks {
+			c := &t.Checks[ci]
+			if !validName(c.Name) || constraints[c.Name] {
+				return d, fmt.Errorf("table %s: invalid or conflicting check constraint name %q", t.Name, c.Name)
+			}
+			constraints[c.Name] = true
+			if c.Expression, err = NormalizeCheck(tableColumns[t.Name], c.Expression); err != nil {
+				return d, fmt.Errorf("table %s check %s: %w", t.Name, c.Name, err)
+			}
+		}
 	}
 	for ti := range d.Tables {
 		t := &d.Tables[ti]
@@ -515,6 +528,7 @@ func Normalize(in Document) (Document, error) {
 		sort.Slice(t.Indexes, func(i, j int) bool { return t.Indexes[i].Name < t.Indexes[j].Name })
 		sort.Slice(t.Unique, func(i, j int) bool { return t.Unique[i].Name < t.Unique[j].Name })
 		sort.Slice(t.ForeignKeys, func(i, j int) bool { return t.ForeignKeys[i].Name < t.ForeignKeys[j].Name })
+		sort.Slice(t.Checks, func(i, j int) bool { return t.Checks[i].Name < t.Checks[j].Name })
 	}
 	sort.Slice(d.Tables, func(i, j int) bool { return d.Tables[i].Name < d.Tables[j].Name })
 	return d, nil
