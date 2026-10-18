@@ -2,7 +2,7 @@
 
 Updated: 2026-10-17, review fixes and wider schema contract.
 
-Status: CODE AND DOCS COMPLETE, NOT RELEASED. VERSION and the CLI still report 0.1.0-alpha.1. Publishing 0.2.0 needs the owner's explicit go-ahead: update VERSION and internal/cli/cli.go together, rewrite RELEASE_NOTES.md (it still describes 0.1.0-alpha.1) and follow RELEASING.md. The website (photozeitgeist/forgeschema.com) has not been updated for these changes yet.
+Status: owner authorized v0.2.0-alpha.1 and the website update on 2026-10-18. Code commits 4990ba6 and 10f85eb passed CI on PostgreSQL 16.10 and 17.6 (run 39090098516). VERSION, the CLI and RELEASE_NOTES.md now describe 0.2.0-alpha.1.
 
 ## Review fixes and wider schema contract
 

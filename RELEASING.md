@@ -1,6 +1,6 @@
 # Release process
 
-The owner authorized the first GitHub release and downloadable binaries on 2026-10-15. Version v0.1.0-alpha.1 is an alpha prerelease under Apache 2.0. This authorization is recorded separately from the earlier six-session prototype checkpoints.
+The owner authorized the first GitHub release and downloadable binaries on 2026-10-15. Version v0.1.0-alpha.1 is an alpha prerelease under Apache 2.0. This authorization is recorded separately from the earlier six-session prototype checkpoints. The owner authorized v0.2.0-alpha.1 on 2026-10-18.
 
 VERSION and internal/cli/cli.go must agree. The Release workflow runs for main-branch changes to VERSION, its own YAML or scripts/release.sh, and supports manual workflow_dispatch. Ordinary documentation/source commits do not publish another release automatically. Future versions require an intentional version change and matching notes; existing release names are never overwritten.
 

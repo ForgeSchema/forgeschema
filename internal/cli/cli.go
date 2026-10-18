@@ -18,7 +18,7 @@ import (
 	"github.com/ForgeSchema/forgeschema/schema"
 )
 
-const Version = "0.1.0-alpha.1"
+const Version = "0.2.0-alpha.1"
 const usage = `ForgeSchema — PostgreSQL schema evolution prototype
 Usage:
   forgeschema version

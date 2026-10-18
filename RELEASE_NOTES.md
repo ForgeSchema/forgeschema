@@ -1,11 +1,39 @@
-# ForgeSchema v0.1.0-alpha.1
+# ForgeSchema v0.2.0-alpha.1
 
-First public alpha of the PostgreSQL schema evolution CLI, licensed under Apache 2.0. This is an early prototype release, not a production-readiness claim.
+Second alpha of the PostgreSQL schema evolution CLI, licensed under Apache 2.0. Still an early release, not a production-readiness claim.
 
-Inspect supported PostgreSQL 16/17 schemas, review deterministic format 1 migration artifacts, apply supported changes transactionally and verify supported structural drift independently. Supported evolution includes new tables/primary keys, explicit column renames, nullable additions and ordinary indexes. The browser demo replays actual PostgreSQL 16.10/17.6 results.
+## What's new
 
-Six archives provide Linux, macOS and Windows binaries for amd64 (x86-64) and arm64. Each archive includes the Apache license, attribution, dependency notices and key guides. SHA256SUMS covers every archive. Binaries are built without CGO; macOS and Windows binaries are not code-signed or notarized. Linux amd64 is smoke-tested; other targets are cross-compiled and have not been run on their native platforms.
+ForgeSchema now reads and writes far more of what real schemas use. Inspect, plan, apply and verify all understand:
 
-The release workflow gates packaging on race tests, vet, the full PostgreSQL 16.10/17.6 suites, disposable CLI walkthroughs and browser replay checks. It smoke-tests the packaged Linux CLI's version, validation and byte-identical example plan before publishing.
+- varchar(n), char(n) and numeric(p,s) types
+- column defaults: literals plus now(), current_timestamp, localtimestamp, current_date and gen_random_uuid()
+- identity columns (GENERATED ALWAYS / BY DEFAULT AS IDENTITY)
+- unique constraints and unique indexes
+- foreign keys between tables in the same schema, with ON DELETE / ON UPDATE actions
 
-Pause external DDL before apply. Apply uses exclusive source-table locks and can block application traffic. The narrow supported contract rejects unsupported constraints/features and blocks destructive conversions. A commit connection error can leave outcome uncertain. Read APPLY.md, FEATURES.md and VERIFY.md before using a real database. See WALKTHROUGH.md for reproduction against an explicitly disposable database.
+Plans can now add a required column when it has a default, widen varchar and numeric columns, change nullability and defaults, and add unique constraints, indexes and foreign keys to existing tables. Drops and other type conversions are still blocked. examples/shop.yaml shows the whole contract.
+
+## Apply
+
+- Locks only the tables a plan changes (plus the foreign key partners of a column whose type changes), so unrelated tables keep serving traffic. `plan --explain` lists the locks.
+- `--lock-timeout`, `--statement-timeout` and `--timeout` flags for slow steps such as index builds on large tables.
+- Failures show PostgreSQL's message and SQLSTATE, without row values or connection details.
+- New exit codes: 5 when the database no longer matches the plan, 6 when the commit outcome is unknown.
+
+## Fixes
+
+- A text default containing a backslash could inject SQL on a server running with standard_conforming_strings off. Backslashes are now rejected and apply/inspect force the setting on.
+- Inspection no longer waits behind other sessions' locks on tables it only reads.
+
+## Compatibility
+
+Plan format is still 1. Plans saved with 0.1.0-alpha.1 load, validate and apply unchanged. Plans 0.1 blocked for changes that are now supported must be rebuilt.
+
+## Downloads
+
+Six archives for Linux, macOS and Windows on amd64 and arm64, each with the Apache license, attribution, dependency notices and key guides, plus SHA256SUMS. Binaries are built without CGO; macOS and Windows binaries are not code-signed or notarized. Linux amd64 is smoke-tested; other targets are cross-compiled.
+
+The release workflow gates packaging on race tests, vet, the PostgreSQL 16.10 and 17.6 suites, disposable CLI walkthroughs and browser replay checks.
+
+Pause external DDL before apply. Read APPLY.md, FEATURES.md and VERIFY.md before using a real database.
