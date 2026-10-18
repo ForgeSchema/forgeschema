@@ -1,0 +1,6 @@
+# Keep LF on every checkout, Windows included: the release smoke test
+# compares files byte for byte and reads the version from cli.go.
+* text=auto eol=lf
+*.png binary
+*.zip binary
+*.gz binary
