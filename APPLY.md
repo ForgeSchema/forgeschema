@@ -15,7 +15,7 @@ The apply command reads a JSON plan file and uses DATABASE_URL from the environm
 | Exit | Meaning |
 | --- | --- |
 | 0 | Applied, or no changes. |
-| 1 | Invalid input, or a lock, SQL or history failure; the transaction was not committed. The message names the stage and includes PostgreSQL's message and SQLSTATE, for example a lock timeout (55P03), NULLs found by SET NOT NULL (23502) or duplicates found by a unique constraint (23505). PostgreSQL's detail line is left out because it can quote row values, such as the duplicated key. |
+| 1 | Invalid input, or a lock, SQL or history failure; the transaction was not committed (for an online plan, the message says when its first phase was, and the plan can be resumed). The message names the stage and includes PostgreSQL's message and SQLSTATE, for example a lock timeout (55P03), NULLs found by SET NOT NULL (23502) or duplicates found by a unique constraint (23505). PostgreSQL's detail line is left out because it can quote row values, such as the duplicated key. |
 | 2 | Usage or configuration error, including missing DATABASE_URL or an invalid timeout. |
 | 3 | The artifact is a blocked plan. |
 | 5 | Drift: the live source no longer matches the reviewed plan (inspect again and build a new plan), or the result didn't match the reviewed target, usually because of concurrent DDL. Nothing was committed. |
@@ -35,11 +35,23 @@ Apply opens a READ COMMITTED transaction with standard_conforming_strings on, wh
 
 Only after all relation locks have been acquired does Apply read catalog metadata and compare the live source fingerprint with the reviewed source. READ COMMITTED is deliberate: an inspection snapshot taken before waiting for a relation lock would miss a schema change committed while waiting. The source check uses fresh catalog reads after that wait.
 
-The engine validates isolated bookkeeping storage, executes the frozen operations, reinspects the target, compares its fingerprint, writes migration history and commits. Every supported operation in PLANNING.md is transactional DDL. CONCURRENTLY and other nontransactional operations are not accepted by the canonical planner. Failure before commit rolls back the transaction's application DDL, metadata creation and history insert together.
+The engine validates isolated bookkeeping storage, executes the frozen operations, reinspects the target, compares its fingerprint, writes migration history and commits. Every operation of a plain plan is transactional DDL. Failure before commit rolls back the transaction's application DDL, metadata creation and history insert together. Online plans, below, are the one exception.
 
 Default lock timeout is five seconds, statement timeout thirty seconds and overall Apply deadline sixty seconds (or the caller's earlier context deadline). The CLI flags --lock-timeout, --statement-timeout and --timeout take Go durations such as 500ms, 2m or 1h, for example `forgeschema apply --statement-timeout 30m --timeout 45m reviewed-plan.json` for an index build on a large table. The Go API postgres.Apply(ctx, db, plan, ApplyOptions{LockTimeout, StatementTimeout, Timeout}) accepts the same values; each must be at least one millisecond, and zero selects the default. PostgreSQL permissions and resource/physical limits can still cause a supported migration to fail.
 
 The advisory lock coordinates ForgeSchema clients only. Relation locks stabilize the changed tables and newly created relations, but do not prevent DDL on unchanged tables, outside-schema dependencies, event triggers or unrelated schema-level CREATEs. The source check under locks and the final target verification catch structural changes made before them; neither can eliminate an external DDL race after the final check. Run this prototype with external DDL paused. Ownership, grants, comments, row contents and other metadata excluded by INSPECTION.md are not fingerprint drift checks.
+
+## Online plans
+
+A plan built with `plan --online` (PLANNING.md) runs in three phases on one connection, which holds a session-level form of the same advisory lock from start to finish, so no other ForgeSchema apply runs in between.
+
+1. A transaction locks the tables its operations change, checks the live source, runs the operations before the builds, checks the result against the plan's intermediate schema and commits.
+2. Each CREATE INDEX CONCURRENTLY runs on its own. It takes no lock that blocks reads or writes, but it waits for transactions already running on the table, and it reads the table twice, so a large table takes a while: raise --statement-timeout and --timeout to match.
+3. A transaction locks the tables it changes, checks the schema is exactly what the first two phases produced, attaches unique constraints, adds foreign keys, checks the full target, writes history and commits.
+
+If phase 2 or 3 fails, phase 1 stays committed and no history is written. A failed build, for example over duplicate values for a unique index (23505), leaves an invalid index behind, as PostgreSQL always does. The CLI exits 1 and says the first phase is committed. Fix the cause and run the same apply again: it recognises the committed first phase and any indexes already built, drops the invalid index with DROP INDEX CONCURRENTLY, builds it again and finishes. Any other change to the schema in between is drift (exit 5). A finished plan is never applied twice: when the schema looks resumable but history already holds the plan, apply reports drift.
+
+Inspect and verify reject a schema with an invalid index, so an unfinished online apply shows up there too until it is resumed.
 
 ## History storage and role
 

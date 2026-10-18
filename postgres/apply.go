@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ForgeSchema/forgeschema/plan"
@@ -38,9 +39,17 @@ func (e *DriftError) Error() string {
 type ApplyError struct {
 	Stage string
 	Err   error
+	// Resumable means an online plan's first phase is committed: fix the
+	// cause and apply the same plan again to finish it.
+	Resumable bool
 }
 
-func (e *ApplyError) Error() string { return fmt.Sprintf("apply failed during %s: %v", e.Stage, e.Err) }
+func (e *ApplyError) Error() string {
+	if e.Resumable {
+		return fmt.Sprintf("apply stopped during %s: %v; the first phase is committed, so fix the cause and apply the same plan again to finish", e.Stage, e.Err)
+	}
+	return fmt.Sprintf("apply failed during %s: %v", e.Stage, e.Err)
+}
 func (e *ApplyError) Unwrap() error { return e.Err }
 
 // CommitError means the connection did not confirm commit; it must not be
@@ -100,13 +109,16 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 	if err != nil {
 		return empty, err
 	}
+	if _, concurrent, _ := p.Phases(); len(concurrent) > 0 {
+		return applyOnline(ctx, db, p, opts, id)
+	}
 	result := ApplyResult{Status: "no_changes", PlanID: id, TargetFingerprint: p.TargetFingerprint}
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
-		return empty, &ApplyError{"begin", err}
+		return empty, &ApplyError{Stage: "begin", Err: err}
 	}
 	defer tx.Rollback()
-	fail := func(stage string, err error) (ApplyResult, error) { return empty, &ApplyError{stage, err} }
+	fail := func(stage string, err error) (ApplyResult, error) { return empty, &ApplyError{Stage: stage, Err: err} }
 	for _, s := range []struct{ name, value string }{{"search_path", "pg_catalog"}, {"application_name", "forgeschema-apply"}, {"standard_conforming_strings", "on"}, {"lock_timeout", fmt.Sprintf("%dms", opts.LockTimeout.Milliseconds())}, {"statement_timeout", fmt.Sprintf("%dms", opts.StatementTimeout.Milliseconds())}} {
 		if _, err = tx.ExecContext(ctx, "SELECT pg_catalog.set_config($1,$2,true)", s.name, s.value); err != nil {
 			return fail("configuration", err)
@@ -189,6 +201,249 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 	result.Operations = len(p.Operations)
 	return result, nil
 }
+
+// sessionSettings are what every apply sets: catalog-only search_path, its
+// name, standard strings and the caller's timeouts.
+func sessionSettings(opts ApplyOptions) [][2]string {
+	return [][2]string{{"search_path", "pg_catalog"}, {"application_name", "forgeschema-apply"}, {"standard_conforming_strings", "on"},
+		{"lock_timeout", fmt.Sprintf("%dms", opts.LockTimeout.Milliseconds())}, {"statement_timeout", fmt.Sprintf("%dms", opts.StatementTimeout.Milliseconds())}}
+}
+
+type execer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func lockTables(ctx context.Context, q execer, schemaName string, exclusive, referenced []string) error {
+	for _, l := range []struct {
+		tables []string
+		mode   string
+	}{{exclusive, "ACCESS EXCLUSIVE"}, {referenced, "SHARE ROW EXCLUSIVE"}} {
+		for _, table := range l.tables {
+			if _, err := q.ExecContext(ctx, "LOCK TABLE ONLY "+qualified(schemaName, table)+" IN "+l.mode+" MODE"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func fingerprint(d schema.Document) string {
+	fp, _ := d.Fingerprint()
+	return fp
+}
+
+// applyOnline runs a plan with concurrent index builds in three phases on one
+// connection, which holds the session-level coordination lock throughout:
+//
+//  1. a READ COMMITTED transaction for the operations before the builds,
+//     checked against the plan's first intermediate schema, then committed;
+//  2. each CREATE [UNIQUE] INDEX CONCURRENTLY on its own, outside any
+//     transaction;
+//  3. a transaction that attaches unique constraints, adds foreign keys,
+//     checks the full target and records history.
+//
+// If phase 2 or 3 fails, phase 1 stays committed and no history is written.
+// Applying the same plan again resumes: it recognises the first intermediate
+// schema, plus any indexes already built, drops an invalid index left by a
+// failed build and builds it again.
+func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions, id string) (ApplyResult, error) {
+	empty := ApplyResult{}
+	first, concurrent, final := p.Phases()
+	afterFirst, beforeFinal, err := p.Intermediate()
+	if err != nil {
+		return empty, err
+	}
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return empty, &ApplyError{Stage: "begin", Err: err}
+	}
+	defer func() {
+		// The connection goes back to the pool: release the session lock and
+		// settings. A broken connection is discarded by the driver anyway.
+		_, _ = conn.ExecContext(context.Background(), "SELECT pg_catalog.pg_advisory_unlock_all(); RESET ALL")
+		conn.Close()
+	}()
+	committed := false
+	fail := func(stage string, err error) (ApplyResult, error) {
+		return empty, &ApplyError{Stage: stage, Err: err, Resumable: committed}
+	}
+	for _, kv := range sessionSettings(opts) {
+		if _, err = conn.ExecContext(ctx, "SELECT pg_catalog.set_config($1,$2,false)", kv[0], kv[1]); err != nil {
+			return fail("configuration", err)
+		}
+	}
+	if _, err = conn.ExecContext(ctx, "SELECT pg_catalog.pg_advisory_lock($1)", coordinationKey); err != nil {
+		return fail("coordination lock", err)
+	}
+	built := map[string]bool{}
+	for _, op := range concurrent {
+		built[op.Subject] = true
+	}
+
+	// Phase 1, or recognising that it ran before.
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return fail("begin", err)
+	}
+	defer tx.Rollback()
+	exclusive, referenced := p.LockedTablesFor(first)
+	if err = lockTables(ctx, tx, p.Source.Schema, exclusive, referenced); err != nil {
+		return fail("relation locks", err)
+	}
+	live, invalid, err := inspectTxAllowing(ctx, tx, p.Source.Schema, built)
+	if err != nil {
+		return fail("source inspection", err)
+	}
+	if err = prepareHistory(ctx, tx); err != nil {
+		return fail("history validation", err)
+	}
+	if fingerprint(live) == p.SourceFingerprint && len(invalid) == 0 {
+		for _, op := range first {
+			if _, err = tx.ExecContext(ctx, op.SQL); err != nil {
+				return fail("execution", err)
+			}
+		}
+		after, err := inspectTx(ctx, tx, p.Source.Schema)
+		if err != nil {
+			return fail("intermediate inspection", err)
+		}
+		if got := fingerprint(after); got != fingerprint(afterFirst) {
+			return empty, &DriftError{"intermediate", fingerprint(afterFirst), got}
+		}
+		if err = tx.Commit(); err != nil {
+			return empty, &CommitError{Err: err, PlanID: id}
+		}
+	} else {
+		resumed, err := withoutBuilt(live, beforeFinal, built)
+		if err != nil {
+			return empty, &DriftError{"source", p.SourceFingerprint, fingerprint(live)}
+		}
+		if fingerprint(resumed) != fingerprint(afterFirst) {
+			return empty, &DriftError{"source", p.SourceFingerprint, fingerprint(live)}
+		}
+		// A finished plan that only builds indexes looks like one to resume:
+		// its history row tells them apart, so it is never applied twice.
+		var done bool
+		if err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM forgeschema_meta.migrations WHERE plan_id=$1)", id).Scan(&done); err != nil {
+			return fail("history validation", err)
+		}
+		if done {
+			return empty, &DriftError{"source", p.SourceFingerprint, fingerprint(live)}
+		}
+		if err = tx.Rollback(); err != nil {
+			return fail("resume", err)
+		}
+	}
+	committed = true
+
+	// Phase 2: each build on its own, outside a transaction.
+	for _, op := range concurrent {
+		stage := "concurrent index " + op.Subject
+		var valid sql.NullBool
+		err := conn.QueryRowContext(ctx, `SELECT i.indisvalid AND i.indisready AND i.indislive FROM pg_catalog.pg_class c
+ JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace JOIN pg_catalog.pg_index i ON i.indexrelid=c.oid
+ WHERE n.nspname=$1 AND c.relname=$2`, p.Source.Schema, op.Subject).Scan(&valid)
+		switch {
+		case err == sql.ErrNoRows:
+		case err != nil:
+			return fail(stage, err)
+		case valid.Bool:
+			continue // built by an earlier run; its definition was checked above
+		default:
+			if _, err = conn.ExecContext(ctx, "DROP INDEX CONCURRENTLY "+qualified(p.Source.Schema, op.Subject)); err != nil {
+				return fail(stage, err)
+			}
+		}
+		if _, err = conn.ExecContext(ctx, op.SQL); err != nil {
+			return fail(stage, err)
+		}
+	}
+
+	// Phase 3: attach constraints, add foreign keys, verify, record history.
+	tx, err = conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return fail("begin", err)
+	}
+	defer tx.Rollback()
+	exclusive, referenced = p.LockedTablesFor(final)
+	if err = lockTables(ctx, tx, p.Source.Schema, exclusive, referenced); err != nil {
+		return fail("relation locks", err)
+	}
+	live, err = inspectTx(ctx, tx, p.Source.Schema)
+	if err != nil {
+		return fail("intermediate inspection", err)
+	}
+	if got := fingerprint(live); got != fingerprint(beforeFinal) {
+		return empty, &DriftError{"intermediate", fingerprint(beforeFinal), got}
+	}
+	if err = prepareHistory(ctx, tx); err != nil {
+		return fail("history validation", err)
+	}
+	for _, op := range final {
+		if _, err = tx.ExecContext(ctx, op.SQL); err != nil {
+			return fail("execution", err)
+		}
+	}
+	actual, err := inspectTx(ctx, tx, p.Target.Schema)
+	if err != nil {
+		return fail("target inspection", err)
+	}
+	if got := fingerprint(actual); got != p.TargetFingerprint {
+		return empty, &DriftError{"target", p.TargetFingerprint, got}
+	}
+	var token [16]byte
+	if _, err = rand.Read(token[:]); err != nil {
+		return fail("migration identifier", err)
+	}
+	result := ApplyResult{Status: "applied", PlanID: id, MigrationID: hex.EncodeToString(token[:]), Operations: len(p.Operations), TargetFingerprint: p.TargetFingerprint}
+	artifact, err := json.Marshal(p)
+	if err != nil {
+		return fail("history encoding", err)
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO forgeschema_meta.migrations
+ (migration_id,plan_id,schema_name,source_fingerprint,target_fingerprint,operation_count,applied_at,plan_json)
+ VALUES($1,$2,$3,$4,$5,$6,pg_catalog.clock_timestamp(),$7::jsonb)`, result.MigrationID, id, p.Source.Schema, p.SourceFingerprint, p.TargetFingerprint, len(p.Operations), string(artifact)); err != nil {
+		return fail("history recording", err)
+	}
+	if err = tx.Commit(); err != nil {
+		return empty, &CommitError{Err: err, PlanID: id, MigrationID: result.MigrationID}
+	}
+	return result, nil
+}
+
+// withoutBuilt removes from live the indexes the plan builds concurrently,
+// after checking each one present matches its definition in beforeFinal.
+func withoutBuilt(live, beforeFinal schema.Document, built map[string]bool) (schema.Document, error) {
+	want := map[string]schema.Index{}
+	for _, t := range beforeFinal.Tables {
+		for _, x := range t.Indexes {
+			if built[x.Name] {
+				want[t.Name+"\x00"+x.Name] = x
+			}
+		}
+	}
+	d, err := schema.Normalize(live)
+	if err != nil {
+		return d, err
+	}
+	for ti := range d.Tables {
+		t := &d.Tables[ti]
+		var keep []schema.Index
+		for _, x := range t.Indexes {
+			if !built[x.Name] {
+				keep = append(keep, x)
+				continue
+			}
+			w, ok := want[t.Name+"\x00"+x.Name]
+			if !ok || w.Unique != x.Unique || strings.Join(w.Columns, "\x00") != strings.Join(x.Columns, "\x00") {
+				return d, fmt.Errorf("index %s.%s differs from the plan", t.Name, x.Name)
+			}
+		}
+		t.Indexes = keep
+	}
+	return schema.Normalize(d)
+}
+
 func prepareHistory(ctx context.Context, tx *sql.Tx) error {
 	if _, err := tx.ExecContext(ctx, "CREATE SCHEMA IF NOT EXISTS forgeschema_meta"); err != nil {
 		return err

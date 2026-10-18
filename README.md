@@ -72,7 +72,6 @@ Without that variable, database tests explicitly skip. The GitHub Actions workfl
 ## Not supported yet
 
 - check constraints, views, sequences other than identity, partitions, triggers and functions
-- concurrent index builds outside the migration transaction
 - changes that need more than one step: required columns without a default, type conversions other than widening, and drops
 - timestamp precision, arrays and enums
 

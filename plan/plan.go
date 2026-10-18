@@ -50,7 +50,21 @@ type Plan struct {
 	Status            string          `json:"status"`
 	Operations        []Operation     `json:"operations"`
 	Blocked           []Blocker       `json:"blocked"`
+	// Online builds indexes on existing tables with CREATE INDEX
+	// CONCURRENTLY, outside the migration transaction. Omitted when false, so
+	// plans without it keep their 0.1/0.2 JSON and plan ID.
+	Online bool `json:"online,omitempty"`
 }
+
+// Options select how Build plans supported changes.
+type Options struct {
+	// Online builds new indexes and unique constraints on existing tables
+	// concurrently: see APPLY.md for the three phases this gives apply.
+	Online bool
+}
+
+// Operation kinds that apply runs outside a transaction.
+const ConcurrentIndex = "create_index_concurrently"
 
 func LoadRenames(r io.Reader) ([]Rename, error) {
 	var f RenameFile
@@ -175,6 +189,11 @@ func widening(from, to string) bool {
 // Build validates and normalizes both schemas. A blocked plan contains NO
 // operations, even if some requested changes would be supported in isolation.
 func Build(source, target schema.Document, renames []Rename) (Plan, error) {
+	return BuildWith(source, target, renames, Options{})
+}
+
+// BuildWith is Build with options.
+func BuildWith(source, target schema.Document, renames []Rename, opts Options) (Plan, error) {
 	var p Plan
 	src, err := schema.Normalize(source)
 	if err != nil {
@@ -262,14 +281,14 @@ func Build(source, target schema.Document, renames []Rename) (Plan, error) {
 		}
 	}
 	wm := tables(working)
-	p = Plan{FormatVersion: FormatVersion, Source: src, Target: dst, Renames: hints, Status: "ready", Operations: []Operation{}, Blocked: []Blocker{}}
+	p = Plan{FormatVersion: FormatVersion, Source: src, Target: dst, Renames: hints, Status: "ready", Operations: []Operation{}, Blocked: []Blocker{}, Online: opts.Online}
 	if p.SourceFingerprint, err = src.Fingerprint(); err != nil {
 		return Plan{}, err
 	}
 	if p.TargetFingerprint, err = dst.Fingerprint(); err != nil {
 		return Plan{}, err
 	}
-	var createOps, renameOps, addOps, alterOps, indexOps, foreignKeyOps []Operation
+	var createOps, renameOps, addOps, alterOps, indexOps, concurrentOps, attachOps, foreignKeyOps []Operation
 	block := func(object, reason string) { p.Blocked = append(p.Blocked, Blocker{object, reason}) }
 	alter := func(table string) string { return "ALTER TABLE " + qualified(dst.Schema, table) }
 	for _, r := range hints {
@@ -301,9 +320,17 @@ func Build(source, target schema.Document, renames []Rename) (Plan, error) {
 			foreignKeyOps = append(foreignKeyOps, Operation{Kind: "add_foreign_key", Table: tt.Name, Subject: fk.Name, SQL: sql + ";", Explanation: explanation})
 		}
 	}
-	addIndexes := func(tt schema.Table, existing map[string]schema.Index) {
+	addIndexes := func(tt schema.Table, existing map[string]schema.Index, created bool) {
 		for _, idx := range tt.Indexes {
 			if _, ok := existing[idx.Name]; ok {
+				continue
+			}
+			if opts.Online && !created {
+				kind, explanation := "CREATE INDEX CONCURRENTLY ", "Build an ordinary btree index concurrently, outside the migration transaction: reads and writes on the table continue while it builds."
+				if idx.Unique {
+					kind, explanation = "CREATE UNIQUE INDEX CONCURRENTLY ", "Build a unique btree index concurrently, outside the migration transaction: reads and writes on the table continue while it builds. If existing rows contain duplicates it fails, leaving an invalid index that a rerun of apply drops and builds again."
+				}
+				concurrentOps = append(concurrentOps, Operation{Kind: ConcurrentIndex, Table: tt.Name, Subject: idx.Name, SQL: kind + quote(idx.Name) + " ON " + qualified(dst.Schema, tt.Name) + " (" + names(idx.Columns) + ");", Explanation: explanation})
 				continue
 			}
 			kind, explanation := "CREATE INDEX ", "Create an ordinary btree index after table and column changes. This is not concurrent and can block writes."
@@ -332,7 +359,7 @@ func Build(source, target schema.Document, renames []Rename) (Plan, error) {
 				explanation = "Create a new table with its declared columns, primary key and unique constraints; indexes and foreign keys follow separately."
 			}
 			createOps = append(createOps, Operation{Kind: "create_table", Table: tt.Name, SQL: "CREATE TABLE " + qualified(dst.Schema, tt.Name) + " (" + strings.Join(definitions, ", ") + ");", Explanation: explanation})
-			addIndexes(tt, nil)
+			addIndexes(tt, nil, true)
 			addForeignKeys(tt, nil, true)
 			continue
 		}
@@ -408,6 +435,11 @@ func Build(source, target schema.Document, renames []Rename) (Plan, error) {
 			if _, ok := sourceUnique[u.Name]; ok {
 				continue
 			}
+			if opts.Online {
+				concurrentOps = append(concurrentOps, Operation{Kind: ConcurrentIndex, Table: tt.Name, Subject: u.Name, SQL: "CREATE UNIQUE INDEX CONCURRENTLY " + quote(u.Name) + " ON " + qualified(dst.Schema, tt.Name) + " (" + names(u.Columns) + ");", Explanation: "Build the unique index for constraint " + u.Name + " concurrently, outside the migration transaction: reads and writes on the table continue while it builds. If existing rows contain duplicates it fails, leaving an invalid index that a rerun of apply drops and builds again."})
+				attachOps = append(attachOps, Operation{Kind: "attach_unique", Table: tt.Name, Subject: u.Name, SQL: alter(tt.Name) + " ADD CONSTRAINT " + quote(u.Name) + " UNIQUE USING INDEX " + quote(u.Name) + ";", Explanation: "Turn the concurrently built index into the unique constraint. Metadata-only; requires a brief table lock."})
+				continue
+			}
 			indexOps = append(indexOps, Operation{Kind: "add_unique", Table: tt.Name, Subject: u.Name, SQL: alter(tt.Name) + " ADD CONSTRAINT " + quote(u.Name) + " UNIQUE (" + names(u.Columns) + ");", Explanation: "Add a unique constraint. PostgreSQL builds its index under an exclusive lock; the migration fails and rolls back if existing rows contain duplicates."})
 		}
 		targetIndexes := indexes(tt)
@@ -419,7 +451,7 @@ func Build(source, target schema.Document, renames []Rename) (Plan, error) {
 				block(tt.Name+" index "+idx.Name, "changing an index definition requires rebuilding it, which is unsupported")
 			}
 		}
-		addIndexes(tt, indexes(st))
+		addIndexes(tt, indexes(st), false)
 		targetFKs := foreignKeys(tt)
 		for _, fk := range st.ForeignKeys {
 			want, ok := targetFKs[fk.Name]
@@ -445,7 +477,10 @@ func Build(source, target schema.Document, renames []Rename) (Plan, error) {
 		p.Status = "blocked"
 		return p, nil
 	}
-	for _, phase := range [][]Operation{createOps, renameOps, addOps, alterOps, indexOps, foreignKeyOps} {
+	// Concurrent builds come after every transactional change they may
+	// depend on, and attaching constraints and adding foreign keys after
+	// them, so apply can split an online plan into three phases.
+	for _, phase := range [][]Operation{createOps, renameOps, addOps, alterOps, indexOps, concurrentOps, attachOps, foreignKeyOps} {
 		p.Operations = append(p.Operations, phase...)
 	}
 	return p, nil
@@ -466,10 +501,20 @@ func contains(ns []string, n string) bool {
 // keys, which apply locks in SHARE ROW EXCLUSIVE mode as PostgreSQL itself
 // would. Both lists are sorted and disjoint.
 func (p Plan) LockedTables() (exclusive, referenced []string) {
+	return p.LockedTablesFor(p.Operations)
+}
+
+// LockedTablesFor is LockedTables for some of the plan's operations, such as
+// one phase of an online plan. Concurrent index builds take no lock that
+// apply has to take for them.
+func (p Plan) LockedTablesFor(ops []Operation) (exclusive, referenced []string) {
 	existing := tables(p.Source)
 	target := tables(p.Target)
 	ex, ref := map[string]bool{}, map[string]bool{}
-	for _, op := range p.Operations {
+	for _, op := range ops {
+		if op.Kind == ConcurrentIndex {
+			continue
+		}
 		if _, ok := existing[op.Table]; ok {
 			ex[op.Table] = true
 		}
@@ -510,11 +555,87 @@ func (p Plan) LockedTables() (exclusive, referenced []string) {
 	return exclusive, referenced
 }
 
+// Phases splits the operations for apply: the first transaction, the
+// concurrent index builds, and the final transaction. A plan without
+// concurrent builds has one phase, all in the first transaction.
+func (p Plan) Phases() (first, concurrent, final []Operation) {
+	i := 0
+	for i < len(p.Operations) && p.Operations[i].Kind != ConcurrentIndex {
+		i++
+	}
+	j := i
+	for j < len(p.Operations) && p.Operations[j].Kind == ConcurrentIndex {
+		j++
+	}
+	return p.Operations[:i], p.Operations[i:j], p.Operations[j:]
+}
+
+// Intermediate returns the schema an online plan expects after its first
+// transaction, and after its concurrent builds, before the final one. The
+// final phase's foreign keys are not there yet, and constraints still to be
+// attached exist as unique indexes after the builds.
+func (p Plan) Intermediate() (afterFirst, beforeFinal schema.Document, err error) {
+	_, concurrent, final := p.Phases()
+	built, attached, fks := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	for _, op := range concurrent {
+		built[op.Table+"\x00"+op.Subject] = true
+	}
+	for _, op := range final {
+		switch op.Kind {
+		case "attach_unique":
+			attached[op.Table+"\x00"+op.Subject] = true
+		case "add_foreign_key":
+			fks[op.Table+"\x00"+op.Subject] = true
+		}
+	}
+	strip := func(keepBuilt bool) (schema.Document, error) {
+		d, err := schema.Normalize(p.Target)
+		if err != nil {
+			return d, err
+		}
+		for ti := range d.Tables {
+			t := &d.Tables[ti]
+			var uniques []schema.Unique
+			for _, u := range t.Unique {
+				if attached[t.Name+"\x00"+u.Name] {
+					if keepBuilt {
+						t.Indexes = append(t.Indexes, schema.Index{Name: u.Name, Columns: u.Columns, Unique: true})
+					}
+					continue
+				}
+				uniques = append(uniques, u)
+			}
+			t.Unique = uniques
+			var idx []schema.Index
+			for _, x := range t.Indexes {
+				if built[t.Name+"\x00"+x.Name] && !keepBuilt {
+					continue
+				}
+				idx = append(idx, x)
+			}
+			t.Indexes = idx
+			var keys []schema.ForeignKey
+			for _, fk := range t.ForeignKeys {
+				if !fks[t.Name+"\x00"+fk.Name] {
+					keys = append(keys, fk)
+				}
+			}
+			t.ForeignKeys = keys
+		}
+		return schema.Normalize(d)
+	}
+	if afterFirst, err = strip(false); err != nil {
+		return afterFirst, beforeFinal, err
+	}
+	beforeFinal, err = strip(true)
+	return afterFirst, beforeFinal, err
+}
+
 // Validate rebuilds the plan from its canonical schemas and rename intent and
 // rejects altered SQL, operations, explanations, status or fingerprints. It is
 // an internal consistency check, not a signature or proof the database matches.
 func (p Plan) Validate() error {
-	rebuilt, err := Build(p.Source, p.Target, p.Renames)
+	rebuilt, err := BuildWith(p.Source, p.Target, p.Renames, Options{Online: p.Online})
 	if err != nil {
 		return err
 	}
@@ -543,6 +664,10 @@ func (p Plan) Summary() (string, error) {
 	}
 	if p.Status == "ready" && len(p.Operations) == 0 {
 		fmt.Fprintln(&b, "No schema changes.")
+	}
+	first, concurrent, final := p.Phases()
+	if len(concurrent) > 0 {
+		fmt.Fprintf(&b, "Online plan in three phases: %d operations in a first transaction, %d concurrent index builds outside any transaction, then %d in a final transaction that also verifies the target and records history.\n", len(first), len(concurrent), len(final))
 	}
 	for i, op := range p.Operations {
 		fmt.Fprintf(&b, "%d. %s\n%s\n", i+1, op.Explanation, op.SQL)

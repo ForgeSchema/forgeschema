@@ -65,6 +65,10 @@ func TestPlanCommands(t *testing.T) {
 		{[]string{"plan", "--explain", "../../examples/customers.yaml", "../../examples/customers-next.yaml", "../../examples/customer-renames.yaml"}, 0, `RENAME COLUMN`},
 		{[]string{"plan", "../../examples/customers.yaml", "../../examples/customers-next.yaml"}, 3, `"status": "blocked"`},
 		{[]string{"plan", "missing.yaml", "../../examples/customers.yaml"}, 1, ""},
+		{[]string{"plan", "--online", "--explain", "../../examples/customers.yaml", "../../examples/customers-next.yaml", "../../examples/customer-renames.yaml"}, 0, `RENAME COLUMN`},
+		{[]string{"plan", "--explain", "--online", "../../examples/customers.yaml", "../../examples/customers.yaml"}, 0, ``},
+		{[]string{"plan", "--online", "--online", "../../examples/customers.yaml", "../../examples/customers.yaml"}, 2, ""},
+		{[]string{"plan", "--fast", "../../examples/customers.yaml", "../../examples/customers.yaml"}, 2, ""},
 	}
 	for _, c := range cases {
 		var out, errs bytes.Buffer

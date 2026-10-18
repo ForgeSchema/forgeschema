@@ -38,9 +38,21 @@ Plans run in six phases. Within each phase, normalized table/name order or sorte
 
 Any step that fails against real data (duplicates, NULLs, orphan rows) makes the whole transaction roll back; apply reports PostgreSQL's reason and SQLSTATE.
 
-Every schema, table, column, constraint and index identifier is quoted. Types and defaults come only from the normalized schema whitelist, not arbitrary SQL input. Ordinary CREATE INDEX is not concurrent and can block writes. ALTER TABLE operations require table locks; --explain lists the tables apply will lock. Planning does not estimate lock duration or inspect row counts.
+Every schema, table, column, constraint and index identifier is quoted. Types and defaults come only from the normalized schema whitelist, not arbitrary SQL input. A plain plan builds indexes with ordinary CREATE INDEX, which blocks writes to the table while it runs; see Online plans below for building them concurrently. ALTER TABLE operations require table locks; --explain lists the tables apply will lock. Planning does not estimate lock duration or inspect row counts.
 
 Still blocked: dropping or implicitly renaming tables, columns, indexes, unique constraints or foreign keys; type conversions other than the widening above; adding a required column without a default; adding an identity column to an existing table, or adding, removing or changing identity on an existing column; renaming an identity column; altering a primary key; and changing an index, unique constraint or foreign key definition. Required columns are allowed on a newly created empty table. Target normalization rejects relation-name collisions before a plan is generated; since ready plans remove no relations, existing names cannot be silently recycled.
+
+## Online plans
+
+`forgeschema plan --online` builds indexes on existing tables with CREATE INDEX CONCURRENTLY, so reads and writes keep going while a large table is indexed. A new unique constraint on an existing table is built the same way, as a unique index, and then attached with ADD CONSTRAINT ... UNIQUE USING INDEX, which takes a brief lock. Indexes on tables the plan creates are built with the table, as before. Plans without such indexes come out the same with or without the flag.
+
+An online plan runs in three phases, and --explain says so:
+
+1. one transaction for everything before the builds (new tables, renames, new columns, column changes), checked against the expected intermediate schema and committed;
+2. each concurrent build on its own, outside any transaction (operation kind create_index_concurrently);
+3. one transaction that attaches the unique constraints (attach_unique), adds the foreign keys, checks the full target and records history.
+
+The online flag is part of the artifact: validation rebuilds the plan with the same flag, so changing it makes the plan fail validation. APPLY.md explains what happens when a phase fails.
 
 ## Compatibility with 0.1 plans
 

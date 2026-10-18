@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -19,12 +20,14 @@ import (
 )
 
 const Version = "0.2.0-alpha.1"
+const planUsage = "usage: forgeschema plan [--explain] [--online] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]"
+
 const usage = `ForgeSchema — PostgreSQL schema evolution prototype
 Usage:
   forgeschema version
   forgeschema validate SCHEMA.yaml
   forgeschema inspect SCHEMA_NAME
-  forgeschema plan [--explain] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]
+  forgeschema plan [--explain] [--online] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]
   forgeschema apply [--lock-timeout 5s] [--statement-timeout 30s] [--timeout 60s] PLAN.json
   forgeschema verify EXPECTED.yaml
   forgeschema verify --plan PLAN.json
@@ -32,7 +35,8 @@ Usage:
 
 Inspection uses DATABASE_URL and reads catalog metadata only, with a 30-second
 timeout. PostgreSQL 16 and 17 are supported. Planning is offline and does not
-execute SQL. A blocked plan exits 3. Apply executes an exact reviewed artifact;
+execute SQL; --online builds indexes on existing tables concurrently. A
+blocked plan exits 3. Apply executes an exact reviewed artifact;
 pause external DDL first. It exits 5 when the database no longer matches the
 plan and 6 when the commit outcome is unknown. Verify is read-only and exits 4
 on structural drift.
@@ -165,6 +169,9 @@ func Run(args []string, out, errs io.Writer) int {
 				if stage.Stage == "begin" {
 					return fail(errs, "could not start the migration transaction; check DATABASE_URL, network and permissions", 1)
 				}
+				if stage.Resumable {
+					return fail(errs, "migration stopped during "+stage.Stage+detail(err)+"; the first phase of this online plan is committed and no history was recorded, so fix the cause and apply the same plan again to finish it", 1)
+				}
 				return fail(errs, "migration failed during "+stage.Stage+detail(err)+"; transaction was not committed", 1)
 			}
 			return fail(errs, "could not apply reviewed migration plan", 1)
@@ -177,13 +184,20 @@ func Run(args []string, out, errs io.Writer) int {
 		return 0
 	case "plan":
 		inputs := args[1:]
-		explain := false
-		if len(inputs) > 0 && inputs[0] == "--explain" {
-			explain = true
+		explain, online := false, false
+		for len(inputs) > 0 && strings.HasPrefix(inputs[0], "--") {
+			switch {
+			case inputs[0] == "--explain" && !explain:
+				explain = true
+			case inputs[0] == "--online" && !online:
+				online = true
+			default:
+				return fail(errs, planUsage, 2)
+			}
 			inputs = inputs[1:]
 		}
 		if len(inputs) < 2 || len(inputs) > 3 {
-			return fail(errs, "usage: forgeschema plan [--explain] CURRENT.yaml DESIRED.yaml [RENAMES.yaml]", 2)
+			return fail(errs, planUsage, 2)
 		}
 		src, err := loadSchema(inputs[0])
 		if err != nil {
@@ -205,7 +219,7 @@ func Run(args []string, out, errs io.Writer) int {
 				return fail(errs, err.Error(), 1)
 			}
 		}
-		p, err := plan.Build(src, dst, renames)
+		p, err := plan.BuildWith(src, dst, renames, plan.Options{Online: online})
 		if err != nil {
 			return fail(errs, err.Error(), 1)
 		}

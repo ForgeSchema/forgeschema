@@ -48,6 +48,32 @@ func Inspect(ctx context.Context, db *sql.DB, name string) (schema.Document, err
 // inspectTx uses the caller's transaction snapshot. Apply uses READ COMMITTED
 // and calls this only after acquiring relation locks, then again after DDL.
 func inspectTx(ctx context.Context, tx *sql.Tx, name string) (schema.Document, error) {
+	doc, _, err := inspectTxAllowing(ctx, tx, name, nil)
+	return doc, err
+}
+
+// inspectTxAllowing is inspectTx that tolerates invalid indexes (left by a
+// failed CREATE INDEX CONCURRENTLY) whose names are in allow: they are left
+// out of the document and returned by name. Any other invalid index is
+// rejected as before. Only an online apply passes names, for the indexes its
+// own plan builds.
+func inspectTxAllowing(ctx context.Context, tx *sql.Tx, name string, allow map[string]bool) (schema.Document, []string, error) {
+	empty := schema.Document{}
+	ix := &indexScan{allow: allow}
+	doc, err := inspectScan(ctx, tx, name, ix)
+	if err != nil {
+		return empty, nil, err
+	}
+	return doc, ix.invalid, nil
+}
+
+// indexScan carries the invalid-index allowance through one inspection.
+type indexScan struct {
+	allow   map[string]bool
+	invalid []string
+}
+
+func inspectScan(ctx context.Context, tx *sql.Tx, name string, ix *indexScan) (schema.Document, error) {
 	empty := schema.Document{}
 	// Qualify every object and prevent user objects shadowing catalog functions.
 	// Standard strings keep backslashes literal in pg_get_expr output, whatever
@@ -73,7 +99,7 @@ func inspectTx(ctx context.Context, tx *sql.Tx, name string) (schema.Document, e
 	if err = checkScope(ctx, tx, oid, name); err != nil {
 		return empty, err
 	}
-	doc, err := readTables(ctx, tx, oid, name)
+	doc, err := readTablesScan(ctx, tx, oid, name, ix)
 	if err != nil {
 		return empty, err
 	}
@@ -113,6 +139,9 @@ func checkScope(ctx context.Context, tx *sql.Tx, oid int64, name string) error {
 }
 
 func readTables(ctx context.Context, tx *sql.Tx, oid int64, name string) (schema.Document, error) {
+	return readTablesScan(ctx, tx, oid, name, &indexScan{})
+}
+func readTablesScan(ctx context.Context, tx *sql.Tx, oid int64, name string, ix *indexScan) (schema.Document, error) {
 	doc := schema.Document{Version: 1, Schema: name, Tables: []schema.Table{}}
 	rows, err := tx.QueryContext(ctx, `SELECT c.oid,c.relname,
  c.relpersistence<>'p' OR c.relispartition OR c.relrowsecurity OR c.relforcerowsecurity
@@ -157,7 +186,7 @@ func readTables(ctx context.Context, tx *sql.Tx, oid int64, name string) (schema
 		if table.PrimaryKey, table.Unique, table.ForeignKeys, err = readConstraints(ctx, tx, oid, info.oid, object, info.name); err != nil {
 			return doc, err
 		}
-		if table.Indexes, err = readIndexes(ctx, tx, info.oid, object); err != nil {
+		if table.Indexes, err = readIndexes(ctx, tx, info.oid, object, ix); err != nil {
 			return doc, err
 		}
 		doc.Tables = append(doc.Tables, table)
@@ -288,12 +317,12 @@ func readConstraints(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, 
 	}
 	return pk, uniques, fks, rows.Err()
 }
-func readIndexes(ctx context.Context, tx *sql.Tx, oid int64, object string) ([]schema.Index, error) {
+func readIndexes(ctx context.Context, tx *sql.Tx, oid int64, object string, ix *indexScan) ([]schema.Index, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT ic.relname,
  i.indisprimary OR EXISTS(SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conindid=i.indexrelid AND c.conrelid=i.indrelid AND c.contype IN ('p','u')),
  i.indisunique,
  am.amname<>'btree' OR i.indisexclusion
- OR NOT i.indisvalid OR NOT i.indisready OR NOT i.indislive OR NOT i.indimmediate
+ OR NOT i.indimmediate
  OR i.indnullsnotdistinct OR i.indisclustered OR i.indisreplident
  OR i.indexprs IS NOT NULL OR i.indpred IS NOT NULL OR i.indnatts<>i.indnkeyatts
  OR ic.reloptions IS NOT NULL OR ic.reltablespace<>0
@@ -304,7 +333,8 @@ func readIndexes(ctx context.Context, tx *sql.Tx, oid int64, object string) ([]s
  JOIN pg_catalog.pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.attnum
  WHERE i.indcollation[(k.n-1)::integer]<>a.attcollation),
  COALESCE((SELECT json_agg(a.attname ORDER BY k.n)::text FROM unnest(i.indkey) WITH ORDINALITY k(attnum,n)
- JOIN pg_catalog.pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.attnum),'[]')
+ JOIN pg_catalog.pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.attnum),'[]'),
+ NOT (i.indisvalid AND i.indisready AND i.indislive)
  FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class ic ON ic.oid=i.indexrelid
  JOIN pg_catalog.pg_am am ON am.oid=ic.relam WHERE i.indrelid=$1 ORDER BY ic.relname`, oid)
 	if err != nil {
@@ -314,10 +344,17 @@ func readIndexes(ctx context.Context, tx *sql.Tx, oid int64, object string) ([]s
 	var indexes []schema.Index
 	for rows.Next() {
 		var idx schema.Index
-		var constraint, special bool
+		var constraint, special, broken bool
 		var columns string
-		if err = rows.Scan(&idx.Name, &constraint, &idx.Unique, &special, &columns); err != nil {
+		if err = rows.Scan(&idx.Name, &constraint, &idx.Unique, &special, &columns, &broken); err != nil {
 			return nil, err
+		}
+		if broken {
+			if ix.allow[idx.Name] && !constraint {
+				ix.invalid = append(ix.invalid, idx.Name)
+				continue
+			}
+			return nil, unsupported(object+" index "+idx.Name, "invalid or unfinished indexes are not represented; drop it or rebuild it")
 		}
 		if special {
 			return nil, unsupported(object+" index "+idx.Name, "only valid ordinary default-order btree indexes without options are represented")
