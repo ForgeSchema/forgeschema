@@ -1,4 +1,6 @@
-# ForgeSchema resume checkpoint
+# ForgeSchema development history
+
+> History. This file records the first development sessions and is kept as it was. [CLAUDE.md](../../CLAUDE.md) says where work stands now; results from 0.1 are in test/results/0.1/.
 
 Updated: 2026-10-17, review fixes and wider schema contract.
 
@@ -45,7 +47,7 @@ Release workflow https://github.com/ForgeSchema/forgeschema/actions/runs/3870962
 
 Downloaded all six public binary archives and SHA256SUMS after publication. Every digest matched; every archive includes the exact Apache license and required notices. Downloaded Linux amd64 passed version, example schema validation and byte-identical example-plan generation. Linux binaries have ELF headers and Windows binaries PE/MZ headers. Other targets are cross-compiled and have not been native-runtime tested; macOS/Windows are unsigned and not notarized. This remains an alpha prototype, not a production-readiness claim.
 
-Evidence/docs commit: ec2d4627d4a8a231ce834409aecc217a1042d2ff. Selected build logs and public verification results: test/results/release-v0.1.0-alpha.1.txt. The exact public checksum manifest is committed beside it. This resume is a separate final checkpoint.
+Evidence/docs commit: ec2d4627d4a8a231ce834409aecc217a1042d2ff. Selected build logs and public verification results: test/results/0.1/release-v0.1.0-alpha.1.txt. The exact public checksum manifest is committed beside it. This resume is a separate final checkpoint.
 
 Website release/download commit: 7178233d19a42d37f72b3eb19f22cc40952d4601. Live https://forgeschema.com/download/ includes all six version-specific binary links and SHA256SUMS. Homepage badge, existing menu copy and current content reflect the alpha; the browser demo explicitly retains its earlier recorded artifacts. Hugo 0.158.0 built 31 pages/39 static files; internal links/assets resolved. All 18 theme blobs are unchanged. Contact remains info@forgeschema.com; no DNS or theme changes were made.
 
@@ -87,7 +89,7 @@ This resume update is the final follow-up checkpoint. Stop and await owner direc
 
 Final engine implementation, guides and evidence: 3db9be9d7f6c8481a1166bff8b37de47ed5603c1.
 Final website content: 724d4a5c02a45ac31018d9e90f28034d1c591278.
-The functional walkthrough commit and exact CI evidence source are recorded in test/results/session-6-postgres-16.10.txt and session-6-postgres-17.6.txt. This resume is a separate checkpoint commit.
+The functional walkthrough commit and exact CI evidence source are recorded in test/results/0.1/session-6-postgres-16.10.txt and session-6-postgres-17.6.txt. This resume is a separate checkpoint commit.
 
 ## Reproduce and review
 
@@ -103,12 +105,12 @@ COMMANDS.md documents commands and exits. FEATURES.md defines supported/unsuppor
 
 Fresh-checkout functional walkthrough and full CI suite passed on PostgreSQL 16.10 and 17.6:
 https://github.com/ForgeSchema/forgeschema/actions/runs/38702626841
-Both runs report passed, six operations, two preserved rows, stale exit 1, drift exit 4 and cleanup dropped. Selected verbatim test/command logs are in test/results/session-6-postgres-*.txt; actual sixteen-file artifact sets are committed for each server.
+Both runs report passed, six operations, two preserved rows, stale exit 1, drift exit 4 and cleanup dropped. Selected verbatim test/command logs are in test/results/0.1/session-6-postgres-*.txt; actual sixteen-file artifact sets are committed for each server.
 
 The final implementation/guides/evidence commit also passed both complete PostgreSQL jobs and the fresh-checkout walkthrough:
 https://github.com/ForgeSchema/forgeschema/actions/runs/38702950666
 
-Local go test -race ./..., go vet ./..., both command builds and git diff --check passed. scripts/check.sh passed; transcript test/results/session-6-local.txt includes offline examples and planner output. Local database cases skip without the test URL; hosted CI supplies the actual database evidence. Native PostgreSQL/Docker are unavailable locally; do not bypass PostgreSQL root protections.
+Local go test -race ./..., go vet ./..., both command builds and git diff --check passed. scripts/check.sh passed; transcript test/results/0.1/session-6-local.txt includes offline examples and planner output. Local database cases skip without the test URL; hosted CI supplies the actual database evidence. Native PostgreSQL/Docker are unavailable locally; do not bypass PostgreSQL root protections.
 
 Earlier tests remain passing: strict input/artifact loading, deterministic planning, populated CLI migration, independent read-only verification, competing apply clients, drift after lock waits, cancellation, statement timeout, SQL/target mismatch rollback, metadata bootstrap and history-insert failure rollback. General process-crash and commit-network-failure fault injection remains unestablished.
 

@@ -1,8 +1,8 @@
-name: Test
+name: test
+# release.yml listens for this workflow by name; keep it "test".
 on:
   push:
   pull_request:
-  workflow_call:
 permissions:
   contents: read
 jobs:
@@ -49,6 +49,26 @@ jobs:
           name: walkthrough-postgres-${{ matrix.postgres }}
           path: demo-output/
           if-no-files-found: ignore
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go vet ./...
+      # Database tests skip without FORGESCHEMA_TEST_DATABASE_URL.
+      - run: go test -count=1 ./...
+      - run: go build -o bin/forgeschema ./cmd/forgeschema
+      - run: sh scripts/smoke.sh bin/forgeschema "$(sed -n 's/^const Version = "\(.*\)"$/\1/p' internal/cli/cli.go)"
+
+  release-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/release-plan-test.py
 
   browser-demo:
     runs-on: ubuntu-latest

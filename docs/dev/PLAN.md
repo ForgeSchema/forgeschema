@@ -1,5 +1,7 @@
 # ForgeSchema three-day prototype plan
 
+> History. This file records the first development sessions and is kept as it was. [CLAUDE.md](../../CLAUDE.md) says where work stands now; results from 0.1 are in test/results/0.1/.
+
 Six sessions, approximately 2–3 hours of focused development each, grouped as two sessions per day (12–18 hours total). These are effort budgets, not automatic timed jobs or promises of background execution. Pauses and owner review may spread the work over more calendar days.
 
 The goal is a Go command line prototype for PostgreSQL: inspect an existing database, compare it with a desired YAML schema, save an explained migration plan, apply supported changes, and verify the result. It is not a production-ready migration service.
