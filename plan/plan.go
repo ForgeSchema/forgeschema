@@ -236,7 +236,7 @@ func enumOperations(src, dst schema.Document, block func(object, reason string))
 			if i == 0 {
 				where = " BEFORE " + schema.EnumLiteral(old.Values[0])
 			}
-			ops = append(ops, Operation{Kind: "add_enum_value", Subject: e.Name, SQL: "ALTER TYPE " + qualified(dst.Schema, e.Name) + " ADD VALUE " + schema.EnumLiteral(v) + where + ";", Explanation: "Add value " + schema.EnumLiteral(v) + " to enum " + e.Name + ". Existing rows keep their values. PostgreSQL won't let the same transaction store the new value, so nothing in this plan uses it."})
+			ops = append(ops, Operation{Kind: "add_enum_value", Subject: e.Name, SQL: "ALTER TYPE " + qualified(dst.Schema, e.Name) + " ADD VALUE " + schema.EnumLiteral(v) + where + ";", Explanation: "Add value " + schema.EnumLiteral(v) + " to enum " + e.Name + ". Existing rows keep their values. PostgreSQL won't let the same transaction use the new value, so no default or view in this plan may name it."})
 		}
 	}
 	for _, e := range src.Enums {
@@ -430,6 +430,18 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 			}
 			if addedValues[c.Type][schema.EnumDefaultValue(c.Default)] {
 				block(tt.Name+"."+c.Name, "the default uses enum value "+c.Default+", which this plan adds; PostgreSQL can't use a new value in the transaction that adds it, so add the value in one plan and the default in the next")
+			}
+		}
+	}
+	// A view's query names a value as 'v'::enum (or 'v'::"enum"), which
+	// PostgreSQL evaluates when it creates the view.
+	for _, v := range dst.Views {
+		for e, values := range addedValues {
+			for value := range values {
+				lit := schema.EnumLiteral(value)
+				if strings.Contains(v.Query, lit+"::"+e) || strings.Contains(v.Query, lit+`::"`+e+`"`) {
+					block("view "+v.Name, "the query uses enum value "+lit+", which this plan adds; PostgreSQL can't use a new value in the transaction that adds it, so add the value in one plan and the view change in the next")
+				}
 			}
 		}
 	}

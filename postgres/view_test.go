@@ -280,3 +280,23 @@ func TestStoreExampleRoundTrip(t *testing.T) {
 		t.Fatalf("second plan: %+v %v", again, err)
 	}
 }
+
+// A view may not use an enum value the same plan adds.
+func TestViewUsingNewEnumValueBlocked(t *testing.T) {
+	db := database(t)
+	name := isolated(t, db)
+	applyPlan(t, name, enumDocument(t, name, viewTables))
+	src, err := postgres.Inspect(context.Background(), db, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := strings.Replace(viewTables, "values: [active, closed]", "values: [active, closed, archived]", 1)
+	next = strings.Replace(next, "'active'::status;", "'archived'::status;", 1)
+	p, err := plan.Build(src, enumDocument(t, name, next), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Status != "blocked" || len(p.Blocked) != 1 || p.Blocked[0].Object != "view open_orders" {
+		t.Fatalf("want view blocked: %+v", p.Blocked)
+	}
+}

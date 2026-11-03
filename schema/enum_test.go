@@ -91,6 +91,7 @@ func TestEnumAndArrayRefusals(t *testing.T) {
 		"bad array default": strings.Replace(enumDoc, `default: "'{}'"`, `default: "'{a}'"`, 1),
 		"builtin name":      strings.Replace(enumDoc, "- name: status\n", "- name: text\n", 1),
 		"empty enum":        strings.Replace(enumDoc, `values: [active, "on hold", "it's closed"]`, "values: []", 1),
+		"backslash value":   strings.Replace(enumDoc, `"on hold"`, `"on\\hold"`, 1),
 		"repeated value":    strings.Replace(enumDoc, `values: [active, "on hold", "it's closed"]`, "values: [a, a]", 1),
 		"long value":        strings.Replace(enumDoc, `"on hold"`, `"`+strings.Repeat("x", 64)+`"`, 1),
 		"table clash":       strings.Replace(enumDoc, "- name: status\n", "- name: orders\n", 1),
@@ -134,6 +135,8 @@ func TestEnumAndArrayCatalogForms(t *testing.T) {
 		{"text[]", "'{}'::text[]", "'{}'"},
 		{"character varying(12)[]", "'{}'::character varying[]", "'{}'"},
 		{"status[]", "'{}'::shop.status[]", "'{}'"},
+		{"status", "'active'::shop.\"status\"", "'active'"},
+		{"status", "'active'::\"shop\".\"status\"", "'active'"},
 	}
 	for _, c := range defaults {
 		if got, ok := ColumnDefaultFromCatalog("shop", c.typ, c.expr, enums); !ok || got != c.want {

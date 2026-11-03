@@ -38,7 +38,7 @@ enums:
   values: [open, paid, shipped]
 ```
 
-An enum needs at least one value. Values are 1 to 63 bytes of UTF-8 without control characters, with no repeats; their order is significant. Enum names follow the naming policy above and may not be a built-in type name. PostgreSQL gives every table and every enum a type of the same name, and an array type named with a leading underscore, so a table, view or enum may not share a name, or take the _NAME of another.
+An enum needs at least one value. Values are 1 to 63 bytes of UTF-8 without control characters or backslashes, with no repeats; their order is significant. Enum names follow the naming policy above and may not be a built-in type name. PostgreSQL gives every table and every enum a type of the same name, and an array type named with a leading underscore, so a table, view or enum may not share a name, or take the _NAME of another.
 
 A column type may name an enum of the schema (type: order_state). Any supported type or enum may be a one-dimensional array: text[], integer[], varchar(20)[], order_state[]; a space before [] is allowed. Multidimensional arrays are not represented. An enum column's default is a quoted value of that enum ("'open'"); an array column's only default is "'{}'". Enum and array columns may be in keys, unique constraints and indexes; a foreign key needs the same type on both sides. Check constraints on enum or array columns are outside the grammar below.
 

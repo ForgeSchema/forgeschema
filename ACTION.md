@@ -42,7 +42,7 @@ Only true and false count for the switches; any other value is an error, so a ty
 
 ## Outputs
 
-result is ready, no-changes, blocked, match, drift or error. exit-code is the command's exit code (see COMMANDS.md). report is the Markdown file that was posted, plan the plan JSON (plan mode), ready to hand to `forgeschema apply` in a later step. version, comment-url and comment-id are the release used and the comment.
+result is ready, no-changes, blocked, match, drift or error. exit-code is the command's exit code (see COMMANDS.md). report is the Markdown file that was posted, plan the plan JSON (plan mode), ready to hand to `forgeschema apply` in a later step. version is the release tag used (also when you asked for latest); comment-url and comment-id are the comment.
 
 ## Notes
 

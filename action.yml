@@ -67,7 +67,7 @@ outputs:
     description: File holding the plan JSON (plan mode, when the plan was made), ready for forgeschema apply
     value: ${{ steps.run.outputs.plan }}
   version:
-    description: The release the action ran (a vX.Y.Z tag, latest, or local)
+    description: The release the action ran (its vX.Y.Z tag, also when version is latest, or local)
     value: ${{ steps.install.outputs.version }}
   comment-url:
     description: The pull request comment, when one was posted or updated
@@ -126,8 +126,10 @@ runs:
         get() { curl -fsSL --retry 3 -o "$2" "https://github.com/ForgeSchema/forgeschema/releases/download/$1/$2"; }
         tag=$(resolve "$FS_VERSION") || tag=""
         if [ -n "$tag" ] && get "$tag" "$name"; then :
-        elif [ -n "$own" ] && [ "$FS_VERSION" = "$own" ]; then
-          # A copy of the action from main can name a version not published yet.
+        elif [ -n "$own" ] && [ "$FS_VERSION" = "$own" ] && [ "$(curl -s --retry 3 -o /dev/null -w '%{http_code}' "https://github.com/ForgeSchema/forgeschema/releases/tag/$own")" = 404 ]; then
+          # A copy of the action from main can name a version not published
+          # yet. Only a release that is confirmed missing falls back; a
+          # failed download of one that exists is an error.
           echo "::notice::$FS_VERSION isn't published; using the latest release"
           FS_VERSION=latest
           tag=$(resolve latest) || tag=""
@@ -144,7 +146,7 @@ runs:
         if [ "$ext" = zip ]; then unzip -oq "$name" -d unpacked; bin=$(ls "$dir"/unpacked/*/forgeschema.exe); else tar -xzf "$name" -C unpacked; bin=$(ls "$dir"/unpacked/*/forgeschema); fi
         "$bin" version
         echo "bin=$bin" >> "$GITHUB_OUTPUT"
-        echo "version=$FS_VERSION" >> "$GITHUB_OUTPUT"
+        echo "version=$tag" >> "$GITHUB_OUTPUT"
 
     - name: Plan or verify
       id: run
@@ -166,6 +168,14 @@ runs:
         rm -rf "$tmp"; mkdir -p "$tmp"
         report="$tmp/report.md"
         echo "report=$report" >> "$GITHUB_OUTPUT"
+        # A fence longer than any run of backticks in the text, so a view
+        # query or a value can't close it and turn the rest into Markdown.
+        fence() {
+          local n
+          n=$(printf '%s' "$1" | grep -o '`\+' | awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }')
+          [ "$n" -lt 3 ] && n=3
+          printf '%*s' $((n + 1)) '' | tr ' ' '`'
+        }
         error() {
           echo "exit-code=${2:-1}" >> "$GITHUB_OUTPUT"; echo "result=error" >> "$GITHUB_OUTPUT"
           # The error, never the database URL, goes into the comment. The
@@ -174,7 +184,8 @@ runs:
           msg=$(printf '%s' "$1" | head -c 4000)
           if [ -n "$IN_DB" ]; then msg=${msg//"$IN_DB"/the database}; fi
           echo "::error::forgeschema: $msg"
-          { echo "**ForgeSchema couldn't $IN_MODE** \`$IN_SCHEMA\`:"; echo; echo '````'; printf '%s\n' "$msg"; echo '````'; } > "$report"
+          f=$(fence "$msg")
+          { echo "**ForgeSchema couldn't $IN_MODE** \`$IN_SCHEMA\`:"; echo; echo "$f"; printf '%s\n' "$msg"; echo "$f"; } > "$report"
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; fi
           exit 0
         }
@@ -200,9 +211,10 @@ runs:
             else
               echo "**ForgeSchema verify: drift.** Schema \`$name\` differs from \`$IN_SCHEMA\`:"
               echo
-              echo '````json'
+              f=$(fence "$(cat "$tmp/verify.json")")
+              echo "${f}json"
               cat "$tmp/verify.json"
-              echo '````'
+              echo "$f"
             fi
           } > "$report"
         else
@@ -227,10 +239,11 @@ runs:
               blocked) echo "**ForgeSchema plan for \`$IN_SCHEMA\`: blocked.** These changes can't be planned safely as written:" ;;
             esac
             echo
-            echo '````text'
+            f=$(fence "$(cat "$tmp/plan.txt")")
+            echo "${f}text"
             head -c 60000 "$tmp/plan.txt"
             [ "$(wc -c < "$tmp/plan.txt")" -gt 60000 ] && printf '\n... (cut; the whole plan is in the job log)\n'
-            echo '````'
+            echo "$f"
           } > "$report"
           cat "$tmp/plan.txt"
         fi

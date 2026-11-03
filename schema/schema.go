@@ -451,8 +451,11 @@ func Normalize(in Document) (Document, error) {
 		}
 		seen := map[string]bool{}
 		for _, v := range e.Values {
-			if v == "" || len(v) > 63 || !utf8.ValidString(v) || strings.ContainsFunc(v, unicode.IsControl) {
-				return d, fmt.Errorf("enum %s: value %q must be 1 to 63 bytes of UTF-8 without control characters", e.Name, v)
+			// No backslash, as in defaults: a session with
+			// standard_conforming_strings off would read one as an escape
+			// in the plan's SQL.
+			if v == "" || len(v) > 63 || !utf8.ValidString(v) || strings.ContainsFunc(v, unicode.IsControl) || strings.Contains(v, `\`) {
+				return d, fmt.Errorf("enum %s: value %q must be 1 to 63 bytes of UTF-8 without control characters or backslashes", e.Name, v)
 			}
 			if seen[v] {
 				return d, fmt.Errorf("enum %s: repeated value %q", e.Name, v)
@@ -702,8 +705,17 @@ func ColumnDefaultFromCatalog(schemaName, typ, expr string, enums map[string]Enu
 		if i < 0 {
 			return "", false
 		}
-		cast := expr[i+2:]
-		if cast != typ && cast != schemaName+"."+typ && cast != `"`+schemaName+`".`+typ && cast != quoteType(schemaName)+"."+quoteType(typ) {
+		// PostgreSQL quotes each part of the cast on its own, only when it
+		// needs it: shop.status, shop."order", "my-shop".status.
+		ok := false
+		for _, s := range []string{"", schemaName + ".", quoteType(schemaName) + "."} {
+			for _, t := range []string{typ, quoteType(typ)} {
+				if expr[i+2:] == s+t {
+					ok = true
+				}
+			}
+		}
+		if !ok {
 			return "", false
 		}
 		d, err := normalizeColumnDefault(typ, expr[:i], enums)

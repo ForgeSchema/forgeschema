@@ -164,7 +164,8 @@ jobs:
           want "unreachable" "${{ steps.unreachable.outputs.result }} ${{ steps.unreachable.outcome }}" "error failure"
           want "bad switch" "${{ steps.badswitch.outputs.result }} ${{ steps.badswitch.outcome }}" "error failure"
           want "published" "${{ steps.published.outputs.result }} ${{ steps.published.outputs.version }}" "ready v0.3.0"
-          want "latest" "${{ steps.latest.outputs.result }} ${{ steps.latest.outputs.version }}" "ready latest"
+          want "latest" "${{ steps.latest.outputs.result }}" "ready"
+          [[ "${{ steps.latest.outputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::latest gave version ${{ steps.latest.outputs.version }}, not a tag"; bad=1; }
           want "version" "${{ steps.fresh.outputs.version }}" "local"
           want "no comment on a push" "${{ steps.fresh.outputs.comment-url }}" ""
           if grep -q hunter22secret "$UNREACHABLE" "$GITHUB_STEP_SUMMARY"; then echo "::error::the password is in the report"; bad=1; fi
@@ -172,6 +173,40 @@ jobs:
           grep -q 'CREATE VIEW "store"."open_totals"' "$FRESH" || { echo "::error::the ready report has no SQL"; cat "$FRESH"; bad=1; }
           grep -q 'Blocked orders.notes' "$BLOCKED" || { echo "::error::the blocked report doesn't name the column"; cat "$BLOCKED"; bad=1; }
           grep -q '"column_unexpected"' "$DRIFT" || { echo "::error::the drift report doesn't name the column"; cat "$DRIFT"; bad=1; }
+          exit $bad
+
+  # The install path on macOS and Windows, which have no database service,
+  # from this commit's action.yml: download a published release, check it
+  # against SHA256SUMS, unpack it, run it, and report the unreachable
+  # database as an error.
+  install:
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install a published release and run against no database
+        id: run
+        continue-on-error: true
+        uses: ./
+        with:
+          database-url: postgres://nobody@127.0.0.1:1/none?sslmode=disable&connect_timeout=2
+          schema: examples/shop.yaml
+          version: v0.3.0
+      - name: Check
+        run: |
+          set -u
+          bad=0
+          [ "${{ steps.run.outputs.version }}" = v0.3.0 ] || { echo "::error::version ${{ steps.run.outputs.version }}, want v0.3.0"; bad=1; }
+          [ "${{ steps.run.outputs.result }}" = error ] || { echo "::error::result ${{ steps.run.outputs.result }}, want error"; bad=1; }
+          ext=""; [ "$RUNNER_OS" = Windows ] && ext=.exe
+          "$RUNNER_TEMP/forgeschema-bin/unpacked/"*/forgeschema$ext version | tr -d '\r' | grep -Fx 0.3.0 || { echo "::error::the binary is not 0.3.0"; bad=1; }
           exit $bad
 
   # The comment as a pull request run posts it, on a closed issue kept for
@@ -345,7 +380,7 @@ jobs:
           want() { if [ "$2" != "$3" ]; then echo "::error::$1: got $2, want $3"; bad=1; fi; }
           want "plan" "${{ steps.plan.outputs.result }}" ready
           want "verify" "${{ steps.verify.outputs.result }}" match
-          if [ "${{ matrix.pin }}" = tag ]; then want "version" "${{ steps.plan.outputs.version }}" "$TAG"; else want "version" "${{ steps.plan.outputs.version }}" latest; fi
+          want "version" "${{ steps.plan.outputs.version }}" "$TAG"
           "$RUNNER_TEMP/forgeschema-bin/unpacked/"*/forgeschema version | grep -Fx "${TAG#v}" || { echo "::error::the binary is not $TAG"; bad=1; }
           exit $bad
 

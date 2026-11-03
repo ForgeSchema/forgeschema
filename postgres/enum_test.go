@@ -209,3 +209,58 @@ func TestInspectRefusesOtherTypes(t *testing.T) {
 		}
 	}
 }
+
+// An enum named with a keyword is printed quoted in a default's cast.
+func TestKeywordEnumRoundTrip(t *testing.T) {
+	db := database(t)
+	name := isolated(t, db)
+	want := enumDocument(t, name, `enums:
+- name: order
+  values: [a, b]
+tables:
+- name: t
+  columns:
+  - name: id
+    type: integer
+  - name: m
+    type: order
+    default: "'a'"
+  - name: l
+    type: order[]
+    default: "'{}'"
+  primary_key: [id]
+`)
+	applyPlan(t, name, want)
+	got, err := postgres.Inspect(context.Background(), db, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _ := got.CanonicalJSON()
+	b, _ := want.CanonicalJSON()
+	if string(a) != string(b) {
+		t.Fatalf("inspect differs\n got  %s\n want %s", a, b)
+	}
+}
+
+// PostgreSQL 18 can store CHECK and foreign key constraints as NOT ENFORCED;
+// the contract has no such constraints, so inspection must refuse them.
+func TestInspectRefusesNotEnforced(t *testing.T) {
+	db := database(t)
+	var version int
+	if err := db.QueryRow("SELECT current_setting('server_version_num')::integer").Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if version < 180000 {
+		t.Skip("NOT ENFORCED needs PostgreSQL 18")
+	}
+	for label, ddl := range map[string]string{
+		"check":       "CREATE TABLE %s.t (id integer PRIMARY KEY, n integer NOT NULL, CONSTRAINT t_n_check CHECK (n > 0) NOT ENFORCED)",
+		"foreign key": "CREATE TABLE %s.p (id integer PRIMARY KEY); CREATE TABLE %s.c (id integer PRIMARY KEY, p integer NOT NULL, CONSTRAINT c_p_fkey FOREIGN KEY (p) REFERENCES %s.p (id) NOT ENFORCED)",
+	} {
+		name := isolated(t, db)
+		exec(t, db, strings.ReplaceAll(ddl, "%s", name))
+		if _, err := postgres.Inspect(context.Background(), db, name); err == nil {
+			t.Errorf("%s NOT ENFORCED: inspection accepted it", label)
+		}
+	}
+}

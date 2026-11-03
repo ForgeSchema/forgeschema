@@ -82,9 +82,9 @@ Without that variable, database tests explicitly skip. The GitHub Actions workfl
 
 ## Not supported yet
 
-- check constraints beyond simple comparisons, views, sequences other than identity, partitions, triggers and functions
-- dropping or changing a primary key, and renaming tables, indexes or constraints
-- timestamp precision, arrays and enums
+- check constraints beyond simple comparisons, materialized views and views with options, triggers or rules, sequences other than identity, partitions, triggers and functions
+- dropping or changing a primary key, renaming tables, indexes or constraints, and removing or reordering enum values
+- timestamp precision, multidimensional arrays, domains and other custom types
 
 [CLAUDE.md](CLAUDE.md) says where development stands; [docs/dev](docs/dev) keeps the history of the first sessions. Test output is recorded in [test/results](test/results). The website content is maintained in photozeitgeist/forgeschema.com.
 
