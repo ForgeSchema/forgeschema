@@ -69,7 +69,7 @@ Steps:
 2. [x] Upkeep (9579489): go 1.26, CI on PostgreSQL 16, 17 and 18 (major tags), inspection accepts 18 and its pg_constraint NOT NULL rows.
 3. [x] Phase A (46b773e): enums and arrays; schema/enum_test.go, plan/enum_test.go, postgres/enum_test.go.
 4. [x] Phase B (5081f97): views; postgres/view_test.go (round trip, change, rename around views, removal, a query in another form names the stored form, depends_on checked, online plan, verify drift, refusals, document rules, examples/store.yaml round trip). Plan change: recursive views are not refused (a WITH RECURSIVE query is an ordinary query here). Apply's target drift error now lists the differences.
-5. [ ] Phase C (dc05bd8): action.yml, .github/workflows/action-test.yml (local, comment, download after release on Linux with PostgreSQL, install path on macOS and Windows), ACTION.md; docs (SCHEMA, INSPECTION, PLANNING, APPLY, VERIFY, FEATURES, README, COMMANDS, WALKTHROUGH).
+5. [x] Phase C (dc05bd8, 12868fc; action-test green: local and comment jobs on PostgreSQL 17, since the 0.3.0 download step knows 16 and 17 only): action.yml, .github/workflows/action-test.yml (local, comment, download after release on Linux with PostgreSQL, install path on macOS and Windows), ACTION.md; docs (SCHEMA, INSPECTION, PLANNING, APPLY, VERIFY, FEATURES, README, COMMANDS, WALKTHROUGH).
 6. [ ] Independent review (at most two rounds), fixes, fresh test/results.
 7. [ ] 0.4.0 released by the workflow; assets checked at the tag and latest; downloaded binary run.
 8. [ ] forgeschema.com post and pages; softdevstudio.com note; softdev-plan item 24 done.
