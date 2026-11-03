@@ -11,7 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        postgres: ["16.10", "17.6"]
+        # Major tags, so CI always runs the current minor of each.
+        postgres: ["16", "17", "18"]
     services:
       postgres:
         image: postgres:${{ matrix.postgres }}

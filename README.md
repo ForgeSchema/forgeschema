@@ -12,7 +12,7 @@ Start with [WALKTHROUGH.md](WALKTHROUGH.md). See [COMMANDS.md](COMMANDS.md) for 
 
 ## Try it
 
-Install Go 1.24 or later, then run:
+Install Go 1.26 or later, then run:
 
 ```sh
 go test ./...
@@ -67,7 +67,7 @@ Use a disposable database: the tests create and drop uniquely named schemas and 
 go test -race -count=1 -v ./postgres
 ```
 
-Without that variable, database tests explicitly skip. The GitHub Actions workflow runs them against PostgreSQL 16.10 and 17.6 services. See INSPECTION.md for managed scope, supported objects, ignored metadata and rejection behavior.
+Without that variable, database tests explicitly skip. The GitHub Actions workflow runs them against PostgreSQL 16, 17 and 18 services (the current minor of each). See INSPECTION.md for managed scope, supported objects, ignored metadata and rejection behavior.
 
 ## Not supported yet
 

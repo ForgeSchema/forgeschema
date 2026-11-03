@@ -22,7 +22,7 @@ func (e *UnsupportedError) Error() string {
 func unsupported(object, feature string) error { return &UnsupportedError{object, feature} }
 
 // Inspect reads one existing schema in a single READ ONLY, REPEATABLE READ
-// transaction. PostgreSQL 16 and 17 are supported; other major versions fail.
+// transaction. PostgreSQL 16, 17 and 18 are supported; other major versions fail.
 // The caller owns db and should supply a context deadline. No rows of user data
 // are read. This is a metadata snapshot, not a lock against future schema drift.
 func Inspect(ctx context.Context, db *sql.DB, name string) (schema.Document, error) {
@@ -86,8 +86,8 @@ func inspectScan(ctx context.Context, tx *sql.Tx, name string, ix *indexScan) (s
 	if err = tx.QueryRowContext(ctx, "SELECT current_setting('server_version_num')::integer").Scan(&version); err != nil {
 		return empty, err
 	}
-	if version < 160000 || version >= 180000 {
-		return empty, unsupported("server", "only PostgreSQL 16 and 17 are supported")
+	if version < 160000 || version >= 190000 {
+		return empty, unsupported("server", "only PostgreSQL 16, 17 and 18 are supported")
 	}
 	var oid int64
 	if err = tx.QueryRowContext(ctx, "SELECT oid FROM pg_catalog.pg_namespace WHERE nspname=$1", name).Scan(&oid); err == sql.ErrNoRows {
@@ -260,7 +260,7 @@ var actionCodes = map[string]string{"a": "", "r": "restrict", "c": "cascade", "n
 
 func readConstraints(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, table string, columns []schema.Column) ([]string, []schema.Unique, []schema.ForeignKey, []schema.Check, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT c.conname,c.contype::text,
- c.condeferrable OR c.condeferred OR NOT c.convalidated OR NOT c.conislocal OR c.coninhcount<>0 OR (c.contype='c' AND c.connoinherit)
+ c.condeferrable OR c.condeferred OR NOT c.convalidated OR NOT c.conislocal OR c.coninhcount<>0 OR (c.contype IN ('c','n') AND c.connoinherit)
  OR (c.contype='f' AND (c.confmatchtype<>'s' OR c.confdelsetcols IS NOT NULL OR r.relnamespace<>$2)),
  COALESCE((SELECT json_agg(a.attname ORDER BY k.n)::text FROM unnest(c.conkey) WITH ORDINALITY k(attnum,n)
  JOIN pg_catalog.pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum),'[]'),
@@ -323,6 +323,10 @@ func readConstraints(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, 
 				return nil, nil, nil, nil, unsupported(label, "check expressions outside the supported grammar are not represented")
 			}
 			checks = append(checks, schema.Check{Name: cname, Expression: expr})
+		case "n":
+			// PostgreSQL 18 records NOT NULL as a constraint too; the
+			// column's nullability already carries it, and its name is
+			// not part of the contract.
 		default:
 			return nil, nil, nil, nil, unsupported(label, "exclusion and trigger constraints are not represented")
 		}

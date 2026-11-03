@@ -34,7 +34,7 @@ Usage:
   forgeschema help
 
 Inspection uses DATABASE_URL and reads catalog metadata only, with a 30-second
-timeout. PostgreSQL 16 and 17 are supported. Planning is offline and does not
+timeout. PostgreSQL 16, 17 and 18 are supported. Planning is offline and does not
 execute SQL; --online builds indexes on existing tables concurrently. A
 blocked plan exits 3. Apply executes an exact reviewed artifact;
 pause external DDL first. It exits 5 when the database no longer matches the
