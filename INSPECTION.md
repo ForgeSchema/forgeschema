@@ -14,6 +14,8 @@ Check constraints are read with pg_get_constraintdef and mapped back to the gram
 
 Column types are read with format_type. A pg_catalog base type, an enum of the managed schema, or a one-dimensional array of either is accepted; the schema prefix PostgreSQL prints for an enum is removed. An enum default ('open'::store.order_state) and an empty array default ('{}'::text[]) lose their cast. PostgreSQL 18 records NOT NULL as a constraint in pg_constraint; those are read as the column's nullability, and NO INHERIT ones are rejected.
 
+Enum values with a backslash are rejected, as in schema files.
+
 Plain views are read with pg_get_viewdef, with pg_catalog and the managed schema on the search path, and their depends_on from the dependencies PostgreSQL records for the view's query (tables and views of the schema). Printing a definition takes ACCESS SHARE on the view. A view with options (check option, security barrier, security invoker), triggers, rules beyond its own, column defaults or policies, a view that reads anything in another schema (a table, a function from an extension), and a stored query the schema contract can't hold (one with a backslash in a literal, for example) are rejected.
 
 Identity columns are accepted with PostgreSQL's default sequence only: named TABLE_COLUMN_seq in the same schema, owned by the column, start 1, increment 1, minimum 1, the type's maximum, cache 1 and no cycle. Those sequences are in scope; every other sequence is rejected.

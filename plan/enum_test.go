@@ -85,3 +85,43 @@ func TestEnumPlanBlocks(t *testing.T) {
 		}
 	}
 }
+
+func TestViewEnumValueChecks(t *testing.T) {
+	base := `enums:
+- name: status
+  values: [active]
+- name: status_old
+  values: [a, b]
+tables:
+- name: t
+  columns:
+  - name: id
+    type: integer
+  - name: s
+    type: status
+  - name: o
+    type: status_old
+  - name: l
+    type: status[]
+  primary_key: [id]
+`
+	src := enumDoc(t, base)
+	grown := strings.Replace(base, "values: [active]", "values: [active, a, archived]", 1)
+	for query, blocked := range map[string]bool{
+		"SELECT id FROM t WHERE o = 'a'::status_old":           false,
+		"SELECT id FROM t WHERE s = 'a'::status":               true,
+		"SELECT id FROM t WHERE l = '{archived}'::status[]":    true,
+		"SELECT id FROM t WHERE s = 'archived'::shop.status":   true,
+		"SELECT id FROM t WHERE s = 'active'::status":          false,
+		`SELECT id AS "x'y" FROM t WHERE s = 'active'::status`: false,
+	} {
+		dst := enumDoc(t, grown+"views:\n- name: v\n  query: \""+strings.ReplaceAll(query, `"`, `\"`)+"\"\n  depends_on: [t]\n")
+		p, err := Build(src, dst, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (p.Status == "blocked") != blocked {
+			t.Errorf("%s: status %s %+v", query, p.Status, p.Blocked)
+		}
+	}
+}

@@ -25,7 +25,7 @@ go build -o bin/forgeschema ./cmd/forgeschema
 
 [examples/shop.yaml](examples/shop.yaml) shows the full contract: identity keys, defaults, a unique constraint, a unique index, foreign keys with referential actions and check constraints. [examples/store.yaml](examples/store.yaml) adds an enum, array columns and two views, one reading the other. [examples/customers.yaml](examples/customers.yaml) is the smaller schema used by the walkthrough.
 
-Validation prints canonical JSON on success and errors to stderr on failure. Validation uses exit 0 for success, 1 for invalid input/files, and 2 for usage errors. Blocked plan targets use exit 3; standalone verification uses exit 4 for structural drift; apply uses 5 when the database no longer matches the plan and 6 when a commit outcome is unknown. See SCHEMA.md for the exact supported contract. The current version is 0.3.0. Download packaged binaries and SHA256SUMS from the [latest release](https://github.com/ForgeSchema/forgeschema/releases/latest). Linux, macOS and Windows archives cover amd64 and arm64; see [RELEASING.md](RELEASING.md) for validation and platform limits.
+Validation prints canonical JSON on success and errors to stderr on failure. Validation uses exit 0 for success, 1 for invalid input/files, and 2 for usage errors. Blocked plan targets use exit 3; standalone verification uses exit 4 for structural drift; apply uses 5 when the database no longer matches the plan and 6 when a commit outcome is unknown. See SCHEMA.md for the exact supported contract. The current version is 0.4.0. Download packaged binaries and SHA256SUMS from the [latest release](https://github.com/ForgeSchema/forgeschema/releases/latest). Linux, macOS and Windows archives cover amd64 and arm64; see [RELEASING.md](RELEASING.md) for validation and platform limits.
 
 ## Review a migration plan
 
@@ -82,7 +82,7 @@ Without that variable, database tests explicitly skip. The GitHub Actions workfl
 
 ## Not supported yet
 
-- check constraints beyond simple comparisons, materialized views and views with options, triggers or rules, sequences other than identity, partitions, triggers and functions
+- check constraints beyond simple comparisons, materialized views and views with options, triggers or rules, sequences other than identity, partitions, table triggers and functions
 - dropping or changing a primary key, renaming tables, indexes or constraints, and removing or reordering enum values
 - timestamp precision, multidimensional arrays, domains and other custom types
 

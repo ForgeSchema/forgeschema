@@ -433,14 +433,18 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 			}
 		}
 	}
-	// A view's query names a value as 'v'::enum (or 'v'::"enum"), which
-	// PostgreSQL evaluates when it creates the view.
+	// A view's query names a value as a cast literal ('v'::status, or an
+	// array '{v,w}'::status[]), which PostgreSQL evaluates when it creates
+	// the view.
 	for _, v := range dst.Views {
-		for e, values := range addedValues {
-			for value := range values {
-				lit := schema.EnumLiteral(value)
-				if strings.Contains(v.Query, lit+"::"+e) || strings.Contains(v.Query, lit+`::"`+e+`"`) {
-					block("view "+v.Name, "the query uses enum value "+lit+", which this plan adds; PostgreSQL can't use a new value in the transaction that adds it, so add the value in one plan and the view change in the next")
+		for _, c := range enumCasts(v.Query, dst.Schema) {
+			for value := range addedValues[c.enum] {
+				used := c.literal == value
+				if c.array {
+					used = arrayMentions(c.literal, value)
+				}
+				if used {
+					block("view "+v.Name, "the query uses enum value "+schema.EnumLiteral(value)+", which this plan adds; PostgreSQL can't use a new value in the transaction that adds it, so add the value in one plan and the view change in the next")
 				}
 			}
 		}

@@ -1,6 +1,6 @@
 # Command reference
 
-Build with Go 1.26+: go build -o bin/forgeschema ./cmd/forgeschema. The CLI version is 0.3.0; downloadable binaries and checksums are on the GitHub release page. All database commands use DATABASE_URL from the environment; keep credentials out of arguments and logs.
+Build with Go 1.26+: go build -o bin/forgeschema ./cmd/forgeschema. The CLI version is 0.4.0; downloadable binaries and checksums are on the GitHub release page. All database commands use DATABASE_URL from the environment; keep credentials out of arguments and logs.
 
 | Command | Result |
 | --- | --- |
