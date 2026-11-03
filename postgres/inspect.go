@@ -117,7 +117,7 @@ func checkScope(ctx context.Context, tx *sql.Tx, oid int64, name string) error {
  AND NOT (c.relkind='S' AND EXISTS(SELECT 1 FROM pg_catalog.pg_depend d WHERE d.classid='pg_catalog.pg_class'::regclass
  AND d.objid=c.oid AND d.refclassid='pg_catalog.pg_class'::regclass AND d.deptype='i'))
  ORDER BY c.relname LIMIT 1`, "views, standalone or serial sequences, foreign and partitioned relations are not represented"},
-		{`SELECT typname FROM pg_catalog.pg_type WHERE typnamespace=$1 AND typtype<>'c' AND typelem=0 ORDER BY typname LIMIT 1`, "custom types and domains are not represented"},
+		{`SELECT typname FROM pg_catalog.pg_type WHERE typnamespace=$1 AND typtype NOT IN ('c','e') AND typelem=0 ORDER BY typname LIMIT 1`, "custom types other than enums, and domains, are not represented"},
 		{`SELECT p.proname FROM pg_catalog.pg_proc p WHERE p.pronamespace=$1 ORDER BY p.proname LIMIT 1`, "functions and procedures are not represented"},
 		{`SELECT collname FROM pg_catalog.pg_collation WHERE collnamespace=$1 ORDER BY collname LIMIT 1`, "custom collations are not represented"},
 		{`SELECT conname FROM pg_catalog.pg_conversion WHERE connamespace=$1 ORDER BY conname LIMIT 1`, "custom conversions are not represented"},
@@ -143,6 +143,15 @@ func readTables(ctx context.Context, tx *sql.Tx, oid int64, name string) (schema
 }
 func readTablesScan(ctx context.Context, tx *sql.Tx, oid int64, name string, ix *indexScan) (schema.Document, error) {
 	doc := schema.Document{Version: 1, Schema: name, Tables: []schema.Table{}}
+	enums, err := readEnums(ctx, tx, oid)
+	if err != nil {
+		return doc, err
+	}
+	enumMap := map[string]schema.Enum{}
+	for _, e := range enums {
+		enumMap[e.Name] = e
+	}
+	doc.Enums = enums
 	rows, err := tx.QueryContext(ctx, `SELECT c.oid,c.relname,
  c.relpersistence<>'p' OR c.relispartition OR c.relrowsecurity OR c.relforcerowsecurity
  OR c.relreplident<>'d' OR c.reltablespace<>0 OR c.reloptions IS NOT NULL OR am.amname<>'heap'
@@ -180,7 +189,7 @@ func readTablesScan(ctx context.Context, tx *sql.Tx, oid int64, name string, ix 
 			return doc, unsupported(object, "nonstandard table storage, inheritance, partitioning, policies, rules or triggers")
 		}
 		table := schema.Table{Name: info.name}
-		if table.Columns, err = readColumns(ctx, tx, oid, info.oid, object, info.name); err != nil {
+		if table.Columns, err = readColumns(ctx, tx, oid, info.oid, object, info.name, name, enumMap); err != nil {
 			return doc, err
 		}
 		if table.PrimaryKey, table.Unique, table.ForeignKeys, table.Checks, err = readConstraints(ctx, tx, oid, info.oid, object, info.name, table.Columns); err != nil {
@@ -193,7 +202,32 @@ func readTablesScan(ctx context.Context, tx *sql.Tx, oid int64, name string, ix 
 	}
 	return doc, nil
 }
-func readColumns(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, table string) ([]schema.Column, error) {
+
+// readEnums lists the managed schema's enum types with their values in order.
+func readEnums(ctx context.Context, tx *sql.Tx, nsoid int64) ([]schema.Enum, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT t.typname,json_agg(e.enumlabel ORDER BY e.enumsortorder)::text
+ FROM pg_catalog.pg_type t JOIN pg_catalog.pg_enum e ON e.enumtypid=t.oid
+ WHERE t.typnamespace=$1 AND t.typtype='e' GROUP BY t.typname ORDER BY t.typname`, nsoid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []schema.Enum
+	for rows.Next() {
+		var e schema.Enum
+		var values string
+		if err = rows.Scan(&e.Name, &values); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal([]byte(values), &e.Values); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+func readColumns(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, table, schemaName string, enums map[string]schema.Enum) ([]schema.Column, error) {
 	// Defaults are rendered with relation 0: they cannot reference columns, and
 	// passing the table would make pg_get_expr lock it, so inspection would
 	// wait behind any session holding an exclusive lock on an unrelated table.
@@ -210,7 +244,11 @@ func readColumns(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, tabl
   AND q.seqmax=CASE a.atttypid WHEN 'pg_catalog.int2'::regtype THEN 32767 WHEN 'pg_catalog.int4'::regtype THEN 2147483647 ELSE 9223372036854775807 END),
  a.attgenerated<>'' OR a.attcollation<>t.typcollation
  OR a.attstorage<>t.typstorage OR a.attcompression<>'' OR a.attoptions IS NOT NULL
- OR a.attfdwoptions IS NOT NULL OR tn.nspname<>'pg_catalog' OR t.typtype<>'b' OR t.typelem<>0
+ OR a.attfdwoptions IS NOT NULL
+ OR NOT ((tn.nspname='pg_catalog' AND t.typtype='b' AND t.typelem=0)
+  OR (t.typnamespace=$2 AND t.typtype='e')
+  OR (t.typcategory='A' AND a.attndims<=1 AND EXISTS(SELECT 1 FROM pg_catalog.pg_type et JOIN pg_catalog.pg_namespace en ON en.oid=et.typnamespace
+   WHERE et.oid=t.typelem AND ((en.nspname='pg_catalog' AND et.typtype='b' AND et.typelem=0) OR (et.typnamespace=$2 AND et.typtype='e')))))
  FROM pg_catalog.pg_attribute a JOIN pg_catalog.pg_type t ON t.oid=a.atttypid
  JOIN pg_catalog.pg_namespace tn ON tn.oid=t.typnamespace
  LEFT JOIN pg_catalog.pg_attrdef ad ON ad.adrelid=a.attrelid AND ad.adnum=a.attnum
@@ -228,8 +266,13 @@ func readColumns(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, tabl
 			return nil, err
 		}
 		if special {
-			return nil, unsupported(object+"."+c.Name, "generated columns, custom types, collations or storage options")
+			return nil, unsupported(object+"."+c.Name, "generated columns, custom types other than enums of this schema, multidimensional arrays, collations or storage options")
 		}
+		typ, ok := schema.TypeFromCatalog(schemaName, c.Type, enums)
+		if !ok {
+			return nil, unsupported(object+"."+c.Name, "type "+c.Type+" is not represented")
+		}
+		c.Type = typ
 		switch identity {
 		case "a":
 			c.Identity = "always"
@@ -240,9 +283,8 @@ func readColumns(ctx context.Context, tx *sql.Tx, nsoid, oid int64, object, tabl
 			return nil, unsupported(object+"."+c.Name, "identity columns need the default TABLE_COLUMN_seq sequence with default options")
 		}
 		if expr != "" {
-			typ, ok := schema.NormalizeType(c.Type)
-			d, supported := schema.DefaultFromCatalog(typ, expr)
-			if !ok || !supported {
+			d, supported := schema.ColumnDefaultFromCatalog(schemaName, c.Type, expr, enums)
+			if !supported {
 				feature := "default " + expr + " is outside the supported literal/function defaults"
 				if strings.HasPrefix(expr, "nextval(") {
 					feature += "; serial columns are unsupported, use identity"

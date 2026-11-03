@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/ForgeSchema/forgeschema/internal/strictyaml"
 )
@@ -18,9 +20,18 @@ import (
 const MaxBytes = strictyaml.MaxBytes
 
 type Document struct {
-	Version int     `yaml:"version" json:"version"`
-	Schema  string  `yaml:"schema" json:"schema"`
-	Tables  []Table `yaml:"tables" json:"tables"`
+	Version int    `yaml:"version" json:"version"`
+	Schema  string `yaml:"schema" json:"schema"`
+	// Enums are the schema's enum types; omitted when empty, so documents
+	// without them keep their 0.3 canonical JSON and fingerprint.
+	Enums  []Enum  `yaml:"enums,omitempty" json:"enums,omitempty"`
+	Tables []Table `yaml:"tables" json:"tables"`
+}
+
+// Enum is a PostgreSQL enum type in the managed schema. Values are ordered.
+type Enum struct {
+	Name   string   `yaml:"name" json:"name"`
+	Values []string `yaml:"values" json:"values"`
 }
 type Table struct {
 	Name        string       `yaml:"name" json:"name"`
@@ -138,6 +149,50 @@ func NormalizeType(raw string) (string, bool) {
 		return fmt.Sprintf("numeric(%d,%d)", p, sc), true
 	}
 	return "", false
+}
+
+// ArrayType reports a one-dimensional array type such as integer[].
+func ArrayType(t string) bool { return strings.HasSuffix(t, "[]") }
+
+// ElementType is the element type of an array type, or the type itself.
+func ElementType(t string) string { return strings.TrimSuffix(t, "[]") }
+
+// BuiltinType reports a normalized type that is not an enum or an array.
+func BuiltinType(t string) bool {
+	n, ok := NormalizeType(t)
+	return ok && n == t
+}
+
+// EnumType reports a column type naming one of the document's enums, or an
+// array of one.
+func EnumType(t string) bool {
+	e := ElementType(t)
+	return !BuiltinType(e) && validName(e)
+}
+
+// normalizeColumnType accepts a supported built-in type, the name of one of
+// enums, or a one-dimensional array of either, in canonical spelling.
+func normalizeColumnType(raw string, enums map[string]Enum) (string, bool) {
+	s := strings.Join(strings.Fields(raw), " ")
+	array := false
+	if strings.HasSuffix(s, "[]") {
+		array = true
+		s = strings.TrimSpace(strings.TrimSuffix(s, "[]"))
+		if strings.HasSuffix(s, "[]") {
+			return "", false
+		}
+	}
+	t, ok := NormalizeType(s)
+	if !ok {
+		if _, isEnum := enums[s]; !isEnum {
+			return "", false
+		}
+		t = s
+	}
+	if array {
+		return t + "[]", true
+	}
+	return t, true
 }
 
 // IntegerType reports smallint, integer and bigint.
@@ -377,6 +432,56 @@ func Normalize(in Document) (Document, error) {
 		}
 		relations[t.Name] = true
 	}
+	enums := map[string]Enum{}
+	for ei := range d.Enums {
+		e := &d.Enums[ei]
+		if !validName(e.Name) {
+			return d, fmt.Errorf("invalid or reserved enum name %q", e.Name)
+		}
+		if _, builtin := NormalizeType(e.Name); builtin {
+			return d, fmt.Errorf("enum name %q is a built-in type name", e.Name)
+		}
+		if _, dup := enums[e.Name]; dup {
+			return d, fmt.Errorf("duplicate enum %q", e.Name)
+		}
+		if len(e.Values) == 0 {
+			return d, fmt.Errorf("enum %s: at least one value is required", e.Name)
+		}
+		seen := map[string]bool{}
+		for _, v := range e.Values {
+			if v == "" || len(v) > 63 || !utf8.ValidString(v) || strings.ContainsFunc(v, unicode.IsControl) {
+				return d, fmt.Errorf("enum %s: value %q must be 1 to 63 bytes of UTF-8 without control characters", e.Name, v)
+			}
+			if seen[v] {
+				return d, fmt.Errorf("enum %s: repeated value %q", e.Name, v)
+			}
+			seen[v] = true
+		}
+		enums[e.Name] = *e
+	}
+	// A table and an enum both get a pg_type entry, and an array type named
+	// _NAME; none of these may collide.
+	typeNames := map[string]string{}
+	claim := func(name, what string) error {
+		for _, n := range []string{name, "_" + name} {
+			if other, ok := typeNames[n]; ok {
+				return fmt.Errorf("%s %q conflicts with %s in PostgreSQL's type names", what, name, other)
+			}
+		}
+		typeNames[name] = what + " " + name
+		typeNames["_"+name] = "the array type of " + what + " " + name
+		return nil
+	}
+	for _, t := range d.Tables {
+		if err := claim(t.Name, "table"); err != nil {
+			return d, err
+		}
+	}
+	for _, e := range d.Enums {
+		if err := claim(e.Name, "enum"); err != nil {
+			return d, err
+		}
+	}
 	tableColumns := map[string]map[string]Column{}
 	for ti := range d.Tables {
 		t := &d.Tables[ti]
@@ -395,13 +500,13 @@ func Normalize(in Document) (Document, error) {
 			if _, ok := cols[c.Name]; ok {
 				return d, fmt.Errorf("table %s: duplicate column %q", t.Name, c.Name)
 			}
-			normalized, ok := NormalizeType(c.Type)
+			normalized, ok := normalizeColumnType(c.Type, enums)
 			if !ok {
-				return d, fmt.Errorf("table %s column %s: unsupported type %q", t.Name, c.Name, c.Type)
+				return d, fmt.Errorf("table %s column %s: unsupported type %q (a built-in type, an enum of this schema, or an array of either)", t.Name, c.Name, c.Type)
 			}
 			c.Type = normalized
 			if c.Default != "" {
-				if c.Default, err = NormalizeDefault(c.Type, c.Default); err != nil {
+				if c.Default, err = normalizeColumnDefault(c.Type, c.Default, enums); err != nil {
 					return d, fmt.Errorf("table %s column %s: %w", t.Name, c.Name, err)
 				}
 			}
@@ -531,7 +636,101 @@ func Normalize(in Document) (Document, error) {
 		sort.Slice(t.Checks, func(i, j int) bool { return t.Checks[i].Name < t.Checks[j].Name })
 	}
 	sort.Slice(d.Tables, func(i, j int) bool { return d.Tables[i].Name < d.Tables[j].Name })
+	sort.Slice(d.Enums, func(i, j int) bool { return d.Enums[i].Name < d.Enums[j].Name })
+	if len(d.Enums) == 0 {
+		d.Enums = nil
+	}
 	return d, nil
+}
+
+// normalizeColumnDefault is NormalizeDefault with enum and array columns: an
+// enum column takes a quoted literal naming one of its values, an array
+// column only '{}'.
+func normalizeColumnDefault(typ, raw string, enums map[string]Enum) (string, error) {
+	v := strings.TrimSpace(raw)
+	switch {
+	case ArrayType(typ):
+		if v != "'{}'" {
+			return "", fmt.Errorf("default for an array column must be '{}'")
+		}
+		return v, nil
+	case EnumType(typ):
+		e := enums[typ]
+		if stringLiteral.MatchString(v) {
+			value := strings.ReplaceAll(v[1:len(v)-1], "''", "'")
+			for _, x := range e.Values {
+				if x == value {
+					return v, nil
+				}
+			}
+		}
+		return "", fmt.Errorf("default for enum %s must be one of its values as a quoted literal, such as '%s'", typ, strings.ReplaceAll(e.Values[0], "'", "''"))
+	}
+	return NormalizeDefault(typ, v)
+}
+
+// EnumLiteral quotes an enum value for SQL.
+func EnumLiteral(v string) string { return "'" + strings.ReplaceAll(v, "'", "''") + "'" }
+
+// EnumDefaultValue is the value an enum column's canonical default names.
+func EnumDefaultValue(d string) string {
+	if !stringLiteral.MatchString(d) {
+		return ""
+	}
+	return strings.ReplaceAll(d[1:len(d)-1], "''", "'")
+}
+
+// ColumnDefaultFromCatalog is DefaultFromCatalog with enum and array columns.
+// PostgreSQL stores an enum default as 'value'::schema.enum and an array
+// default as '{}'::type[]; the casts are implied by the column type.
+func ColumnDefaultFromCatalog(schemaName, typ, expr string, enums map[string]Enum) (string, bool) {
+	switch {
+	case ArrayType(typ):
+		lit, cast, ok := strings.Cut(expr, "::")
+		if !ok || lit != "'{}'" || !strings.HasSuffix(cast, "[]") {
+			return "", false
+		}
+		return lit, true
+	case EnumType(typ):
+		i := strings.LastIndex(expr, "::")
+		if i < 0 {
+			return "", false
+		}
+		cast := expr[i+2:]
+		if cast != typ && cast != schemaName+"."+typ && cast != `"`+schemaName+`".`+typ && cast != quoteType(schemaName)+"."+quoteType(typ) {
+			return "", false
+		}
+		d, err := normalizeColumnDefault(typ, expr[:i], enums)
+		return d, err == nil
+	}
+	return DefaultFromCatalog(typ, expr)
+}
+
+func quoteType(s string) string { return `"` + s + `"` }
+
+// TypeFromCatalog converts format_type output to a column type of this
+// contract: built-in types as they are, and enums of the managed schema,
+// which format_type qualifies, as their bare name.
+func TypeFromCatalog(schemaName, formatted string, enums map[string]Enum) (string, bool) {
+	array := strings.HasSuffix(formatted, "[]")
+	base := strings.TrimSuffix(formatted, "[]")
+	for _, prefix := range []string{schemaName + ".", `"` + schemaName + `".`} {
+		if strings.HasPrefix(base, prefix) {
+			base = strings.Trim(strings.TrimPrefix(base, prefix), `"`)
+			if _, ok := enums[base]; !ok {
+				return "", false
+			}
+			if array {
+				return base + "[]", true
+			}
+			return base, true
+		}
+	}
+	t, ok := NormalizeType(base)
+	if !ok || t != base {
+		return "", false
+	}
+	return formatted, true
 }
 
 // compatible accepts identical types and pairs within the integer,

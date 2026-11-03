@@ -154,6 +154,99 @@ func ColumnSQL(c schema.Column) string {
 	return s + " NOT NULL"
 }
 
+// ColumnSQLIn is ColumnSQL for a column of schemaName, whose type may be one
+// of that schema's enums.
+func ColumnSQLIn(schemaName string, c schema.Column) string {
+	if !schema.EnumType(c.Type) {
+		return ColumnSQL(c)
+	}
+	c.Type = TypeSQL(schemaName, c.Type)
+	return ColumnSQL(c)
+}
+
+// TypeSQL renders a column type for DDL: an enum, or an array of one, is
+// qualified with its schema.
+func TypeSQL(schemaName, t string) string {
+	if !schema.EnumType(t) {
+		return t
+	}
+	if schema.ArrayType(t) {
+		return qualified(schemaName, schema.ElementType(t)) + "[]"
+	}
+	return qualified(schemaName, t)
+}
+
+// enumOperations plans new enum types and new values of existing ones, and
+// blocks what PostgreSQL can't do: dropping a type, or removing or
+// reordering values. It returns the operations and the values each enum
+// gains.
+func enumOperations(src, dst schema.Document, block func(object, reason string)) ([]Operation, map[string]map[string]bool) {
+	var ops []Operation
+	added := map[string]map[string]bool{}
+	existing := map[string]schema.Enum{}
+	for _, e := range src.Enums {
+		existing[e.Name] = e
+	}
+	wanted := map[string]bool{}
+	for _, e := range dst.Enums {
+		wanted[e.Name] = true
+		old, ok := existing[e.Name]
+		if !ok {
+			values := []string{}
+			for _, v := range e.Values {
+				values = append(values, schema.EnumLiteral(v))
+			}
+			ops = append(ops, Operation{Kind: "create_enum", Subject: e.Name, SQL: "CREATE TYPE " + qualified(dst.Schema, e.Name) + " AS ENUM (" + strings.Join(values, ", ") + ");", Explanation: "Create enum type " + e.Name + " with " + fmt.Sprint(len(e.Values)) + " values, before the tables that use it."})
+			continue
+		}
+		// The old values must appear in the target in the same order.
+		pos := map[string]int{}
+		for i, v := range e.Values {
+			pos[v] = i
+		}
+		last := -1
+		ordered := true
+		for _, v := range old.Values {
+			i, ok := pos[v]
+			if !ok || i < last {
+				ordered = false
+				break
+			}
+			last = i
+		}
+		if !ordered {
+			block("enum "+e.Name, "removing or reordering enum values is unsupported; PostgreSQL can only add values")
+			continue
+		}
+		kept := map[string]bool{}
+		for _, v := range old.Values {
+			kept[v] = true
+		}
+		for i, v := range e.Values {
+			if kept[v] {
+				continue
+			}
+			if added[e.Name] == nil {
+				added[e.Name] = map[string]bool{}
+			}
+			added[e.Name][v] = true
+			// Values are placed in target order, so the one before is always
+			// in place; a new first value goes before the first old value.
+			where := " AFTER " + schema.EnumLiteral(e.Values[max(i-1, 0)])
+			if i == 0 {
+				where = " BEFORE " + schema.EnumLiteral(old.Values[0])
+			}
+			ops = append(ops, Operation{Kind: "add_enum_value", Subject: e.Name, SQL: "ALTER TYPE " + qualified(dst.Schema, e.Name) + " ADD VALUE " + schema.EnumLiteral(v) + where + ";", Explanation: "Add value " + schema.EnumLiteral(v) + " to enum " + e.Name + ". Existing rows keep their values. PostgreSQL won't let the same transaction store the new value, so nothing in this plan uses it."})
+		}
+	}
+	for _, e := range src.Enums {
+		if !wanted[e.Name] {
+			block("enum "+e.Name, "dropping an enum type is unsupported")
+		}
+	}
+	return ops, added
+}
+
 // typeModifier extracts the integer arguments of a parameterized type.
 func typeModifier(t, base string) ([]int, bool) {
 	if !strings.HasPrefix(t, base+"(") {
@@ -327,6 +420,19 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 	block := func(object, reason string) { p.Blocked = append(p.Blocked, Blocker{object, reason}) }
 	alter := func(table string) string { return "ALTER TABLE " + qualified(dst.Schema, table) }
 	dropOps := dropOperations(src, drops, block)
+	enumOps, addedValues := enumOperations(src, dst, block)
+	// A default may not use an enum value this plan adds: PostgreSQL refuses
+	// a new value in the transaction that added it.
+	for _, tt := range dst.Tables {
+		for _, c := range tt.Columns {
+			if c.Default == "" || !schema.EnumType(c.Type) || schema.ArrayType(c.Type) {
+				continue
+			}
+			if addedValues[c.Type][schema.EnumDefaultValue(c.Default)] {
+				block(tt.Name+"."+c.Name, "the default uses enum value "+c.Default+", which this plan adds; PostgreSQL can't use a new value in the transaction that adds it, so add the value in one plan and the default in the next")
+			}
+		}
+	}
 	converted := map[string]bool{}
 	for _, c := range conversions {
 		converted[c.Table+"."+c.Column] = true
@@ -385,7 +491,7 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 		if !exists {
 			definitions := []string{}
 			for _, c := range tt.Columns {
-				definitions = append(definitions, ColumnSQL(c))
+				definitions = append(definitions, ColumnSQLIn(dst.Schema, c))
 			}
 			if len(tt.PrimaryKey) > 0 {
 				definitions = append(definitions, "CONSTRAINT "+quote(tt.Name+"_pkey")+" PRIMARY KEY ("+names(tt.PrimaryKey)+")")
@@ -435,12 +541,16 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 							explanation = "Add a column with default " + c.Default + ". The default is evaluated per row, so PostgreSQL rewrites the whole table under an exclusive lock to fill existing rows."
 						}
 					}
-					addOps = append(addOps, Operation{Kind: "add_column", Table: tt.Name, Subject: c.Name, SQL: alter(tt.Name) + " ADD COLUMN " + ColumnSQL(c) + ";", Explanation: explanation})
+					addOps = append(addOps, Operation{Kind: "add_column", Table: tt.Name, Subject: c.Name, SQL: alter(tt.Name) + " ADD COLUMN " + ColumnSQLIn(dst.Schema, c) + ";", Explanation: explanation})
 				}
 				continue
 			}
 			if old.Identity != c.Identity {
 				block(object, "adding, removing or changing an identity is unsupported")
+				continue
+			}
+			if old.Type != c.Type && (schema.EnumType(old.Type) || schema.EnumType(c.Type) || schema.ArrayType(old.Type) || schema.ArrayType(c.Type)) {
+				block(object, "changing a column's type to, from or between enums and arrays is unsupported")
 				continue
 			}
 			convertedDefault := false
@@ -567,7 +677,7 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 	// Concurrent builds come after every transactional change they may
 	// depend on, and attaching constraints and adding foreign keys after
 	// them, so apply can split an online plan into three phases.
-	for _, phase := range [][]Operation{dropOps, createOps, renameOps, addOps, alterOps, checkOps, indexOps, concurrentOps, attachOps, foreignKeyOps} {
+	for _, phase := range [][]Operation{dropOps, enumOps, createOps, renameOps, addOps, alterOps, checkOps, indexOps, concurrentOps, attachOps, foreignKeyOps} {
 		p.Operations = append(p.Operations, phase...)
 	}
 	return p, nil

@@ -125,9 +125,9 @@ func TestUnsupportedStructures(t *testing.T) {
 	cases := map[string]string{
 		"generated":            "CREATE TABLE %s.t (id integer, doubled integer GENERATED ALWAYS AS (id*2) STORED)",
 		"timestamp-precision":  "CREATE TABLE %s.t (v timestamp(2))",
-		"array":                "CREATE TABLE %s.t (v integer[])",
+		"2-d array":            "CREATE TABLE %s.t (v integer[][])",
 		"domain":               "CREATE DOMAIN %s.d AS integer; CREATE TABLE %s.t (v %s.d)",
-		"enum":                 "CREATE TYPE %s.color AS ENUM ('red','green'); CREATE TABLE %s.t(v %s.color)",
+		"domain type":          "CREATE DOMAIN %s.color AS text; CREATE TABLE %s.t(v %s.color)",
 		"custom-type-shadow":   "CREATE DOMAIN %s.integer AS integer; CREATE TABLE %s.t(v %s.integer)",
 		"view":                 "CREATE VIEW %s.v AS SELECT 1 AS id",
 		"materialized-view":    "CREATE MATERIALIZED VIEW %s.v AS SELECT 1 AS id",

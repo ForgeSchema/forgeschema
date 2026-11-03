@@ -16,6 +16,7 @@ type Difference struct {
 	Column     string `json:"column,omitempty"`
 	Index      string `json:"index,omitempty"`
 	Constraint string `json:"constraint,omitempty"`
+	Enum       string `json:"enum,omitempty"`
 	Expected   string `json:"expected"`
 	Actual     string `json:"actual"`
 }
@@ -174,6 +175,26 @@ func Compare(expected, actual Document) ([]Difference, error) {
 			add(Difference{Kind: "table_unexpected", Table: t.Name, Expected: "absent", Actual: "present"})
 		}
 	}
+	ee, ae := map[string]Enum{}, map[string]Enum{}
+	for _, x := range e.Enums {
+		ee[x.Name] = x
+	}
+	for _, x := range a.Enums {
+		ae[x.Name] = x
+	}
+	for _, x := range e.Enums {
+		live, ok := ae[x.Name]
+		if !ok {
+			add(Difference{Kind: "enum_missing", Enum: x.Name, Expected: valueList(x.Values), Actual: "absent"})
+		} else if valueList(x.Values) != valueList(live.Values) {
+			add(Difference{Kind: "enum_values", Enum: x.Name, Expected: valueList(x.Values), Actual: valueList(live.Values)})
+		}
+	}
+	for _, x := range a.Enums {
+		if _, ok := ee[x.Name]; !ok {
+			add(Difference{Kind: "enum_unexpected", Enum: x.Name, Expected: "absent", Actual: valueList(x.Values)})
+		}
+	}
 	sort.Slice(differences, func(i, j int) bool {
 		a, b := differences[i], differences[j]
 		if a.Table != b.Table {
@@ -188,9 +209,18 @@ func Compare(expected, actual Document) ([]Difference, error) {
 		if a.Constraint != b.Constraint {
 			return a.Constraint < b.Constraint
 		}
+		if a.Enum != b.Enum {
+			return a.Enum < b.Enum
+		}
 		return a.Kind < b.Kind
 	})
 	return differences, nil
+}
+
+// valueList renders enum values in order as a JSON array.
+func valueList(vs []string) string {
+	b, _ := json.Marshal(vs)
+	return string(b)
 }
 
 // ForeignKeyDefinition is a compact, deterministic description of a foreign key.
