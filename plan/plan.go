@@ -677,7 +677,8 @@ func BuildWith(source, target schema.Document, renames []Rename, opts Options) (
 	// Concurrent builds come after every transactional change they may
 	// depend on, and attaching constraints and adding foreign keys after
 	// them, so apply can split an online plan into three phases.
-	for _, phase := range [][]Operation{dropOps, enumOps, createOps, renameOps, addOps, alterOps, checkOps, indexOps, concurrentOps, attachOps, foreignKeyOps} {
+	viewDrops, viewCreates := viewOperations(src, dst, tablesChangedForViews(dropOps, renameOps, alterOps))
+	for _, phase := range [][]Operation{viewDrops, dropOps, enumOps, createOps, renameOps, addOps, alterOps, checkOps, indexOps, concurrentOps, attachOps, foreignKeyOps, viewCreates} {
 		p.Operations = append(p.Operations, phase...)
 	}
 	return p, nil
@@ -783,6 +784,7 @@ func (p Plan) Phases() (first, concurrent, final []Operation) {
 func (p Plan) Intermediate() (afterFirst, beforeFinal schema.Document, err error) {
 	_, concurrent, final := p.Phases()
 	built, attached, fks := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	views := createdViews(final)
 	for _, op := range concurrent {
 		built[op.Table+"\x00"+op.Subject] = true
 	}
@@ -828,6 +830,13 @@ func (p Plan) Intermediate() (afterFirst, beforeFinal schema.Document, err error
 			}
 			t.ForeignKeys = keys
 		}
+		var kept []schema.View
+		for _, v := range d.Views {
+			if !views[v.Name] {
+				kept = append(kept, v)
+			}
+		}
+		d.Views = kept
 		return schema.Normalize(d)
 	}
 	if afterFirst, err = strip(false); err != nil {

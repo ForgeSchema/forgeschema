@@ -129,7 +129,6 @@ func TestUnsupportedStructures(t *testing.T) {
 		"domain":               "CREATE DOMAIN %s.d AS integer; CREATE TABLE %s.t (v %s.d)",
 		"domain type":          "CREATE DOMAIN %s.color AS text; CREATE TABLE %s.t(v %s.color)",
 		"custom-type-shadow":   "CREATE DOMAIN %s.integer AS integer; CREATE TABLE %s.t(v %s.integer)",
-		"view":                 "CREATE VIEW %s.v AS SELECT 1 AS id",
 		"materialized-view":    "CREATE MATERIALIZED VIEW %s.v AS SELECT 1 AS id",
 		"sequence":             "CREATE SEQUENCE %s.seq",
 		"partition":            "CREATE TABLE %s.t(id integer) PARTITION BY RANGE(id)",

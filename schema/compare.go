@@ -17,6 +17,7 @@ type Difference struct {
 	Index      string `json:"index,omitempty"`
 	Constraint string `json:"constraint,omitempty"`
 	Enum       string `json:"enum,omitempty"`
+	View       string `json:"view,omitempty"`
 	Expected   string `json:"expected"`
 	Actual     string `json:"actual"`
 }
@@ -195,6 +196,31 @@ func Compare(expected, actual Document) ([]Difference, error) {
 			add(Difference{Kind: "enum_unexpected", Enum: x.Name, Expected: "absent", Actual: valueList(x.Values)})
 		}
 	}
+	ev, av := map[string]View{}, map[string]View{}
+	for _, v := range e.Views {
+		ev[v.Name] = v
+	}
+	for _, v := range a.Views {
+		av[v.Name] = v
+	}
+	for _, v := range e.Views {
+		live, ok := av[v.Name]
+		if !ok {
+			add(Difference{Kind: "view_missing", View: v.Name, Expected: v.Query, Actual: "absent"})
+			continue
+		}
+		if v.Query != live.Query {
+			add(Difference{Kind: "view_query", View: v.Name, Expected: v.Query, Actual: live.Query})
+		}
+		if columnList(v.DependsOn) != columnList(live.DependsOn) {
+			add(Difference{Kind: "view_depends_on", View: v.Name, Expected: columnList(v.DependsOn), Actual: columnList(live.DependsOn)})
+		}
+	}
+	for _, v := range a.Views {
+		if _, ok := ev[v.Name]; !ok {
+			add(Difference{Kind: "view_unexpected", View: v.Name, Expected: "absent", Actual: v.Query})
+		}
+	}
 	sort.Slice(differences, func(i, j int) bool {
 		a, b := differences[i], differences[j]
 		if a.Table != b.Table {
@@ -211,6 +237,9 @@ func Compare(expected, actual Document) ([]Difference, error) {
 		}
 		if a.Enum != b.Enum {
 			return a.Enum < b.Enum
+		}
+		if a.View != b.View {
+			return a.View < b.View
 		}
 		return a.Kind < b.Kind
 	})

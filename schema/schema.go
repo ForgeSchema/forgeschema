@@ -26,6 +26,8 @@ type Document struct {
 	// without them keep their 0.3 canonical JSON and fingerprint.
 	Enums  []Enum  `yaml:"enums,omitempty" json:"enums,omitempty"`
 	Tables []Table `yaml:"tables" json:"tables"`
+	// Views are plain views; omitted when empty, like Enums.
+	Views []View `yaml:"views,omitempty" json:"views,omitempty"`
 }
 
 // Enum is a PostgreSQL enum type in the managed schema. Values are ordered.
@@ -481,6 +483,10 @@ func Normalize(in Document) (Document, error) {
 		if err := claim(e.Name, "enum"); err != nil {
 			return d, err
 		}
+	}
+	// A view is a relation with a row type, so it takes part in both.
+	if err := normalizeViews(&d, reserve, claim); err != nil {
+		return d, err
 	}
 	tableColumns := map[string]map[string]Column{}
 	for ti := range d.Tables {

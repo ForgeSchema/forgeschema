@@ -31,10 +31,35 @@ type ApplyResult struct {
 	Operations        int    `json:"operations"`
 	TargetFingerprint string `json:"target_fingerprint"`
 }
-type DriftError struct{ Phase, Expected, Actual string }
+type DriftError struct {
+	Phase, Expected, Actual string
+	// Differences, after the plan's own changes, say how the result differs
+	// from the target, such as a view query PostgreSQL stores in another form.
+	Differences []schema.Difference
+}
 
 func (e *DriftError) Error() string {
-	return fmt.Sprintf("%s schema fingerprint mismatch: expected %s, got %s", e.Phase, e.Expected, e.Actual)
+	msg := fmt.Sprintf("%s schema fingerprint mismatch: expected %s, got %s", e.Phase, e.Expected, e.Actual)
+	for _, d := range e.Differences {
+		switch {
+		case d.Kind == "view_query":
+			msg += fmt.Sprintf("; view %s: PostgreSQL stores the query as %q, so write it that way in the target", d.View, d.Actual)
+		case d.View != "":
+			msg += fmt.Sprintf("; view %s: %s expected %s, got %s", d.View, d.Kind, d.Expected, d.Actual)
+		default:
+			msg += fmt.Sprintf("; %s %s: expected %s, got %s", d.Kind, strings.Trim(d.Table+"."+d.Column, "."), d.Expected, d.Actual)
+		}
+	}
+	return msg
+}
+
+// targetDrift reports a target mismatch with its differences.
+func targetDrift(p plan.Plan, actual schema.Document, got string) *DriftError {
+	e := &DriftError{Phase: "target", Expected: p.TargetFingerprint, Actual: got}
+	if diffs, err := schema.Compare(p.Target, actual); err == nil {
+		e.Differences = diffs
+	}
+	return e
 }
 
 type ApplyError struct {
@@ -162,7 +187,7 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 		return fail("source fingerprint", err)
 	}
 	if fp != p.SourceFingerprint {
-		return empty, &DriftError{"source", p.SourceFingerprint, fp}
+		return empty, &DriftError{Phase: "source", Expected: p.SourceFingerprint, Actual: fp}
 	}
 	if len(p.Operations) == 0 {
 		if err = tx.Commit(); err != nil {
@@ -192,7 +217,7 @@ func Apply(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions) (App
 		return fail("target fingerprint", err)
 	}
 	if fp != p.TargetFingerprint {
-		return empty, &DriftError{"target", p.TargetFingerprint, fp}
+		return empty, targetDrift(p, actual, fp)
 	}
 	artifact, err := json.Marshal(p)
 	if err != nil {
@@ -362,7 +387,7 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 			return fail("intermediate inspection", err)
 		}
 		if got := fingerprint(after); got != fingerprint(afterFirst) {
-			return empty, &DriftError{"intermediate", fingerprint(afterFirst), got}
+			return empty, &DriftError{Phase: "intermediate", Expected: fingerprint(afterFirst), Actual: got}
 		}
 		if err = tx.Commit(); err != nil {
 			return empty, &CommitError{Err: err, PlanID: id}
@@ -370,10 +395,10 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 	} else {
 		resumed, err := withoutBuilt(live, beforeFinal, built)
 		if err != nil {
-			return empty, &DriftError{"source", p.SourceFingerprint, fingerprint(live)}
+			return empty, &DriftError{Phase: "source", Expected: p.SourceFingerprint, Actual: fingerprint(live)}
 		}
 		if fingerprint(resumed) != fingerprint(afterFirst) {
-			return empty, &DriftError{"source", p.SourceFingerprint, fingerprint(live)}
+			return empty, &DriftError{Phase: "source", Expected: p.SourceFingerprint, Actual: fingerprint(live)}
 		}
 		// A finished plan that only builds indexes looks like one to resume:
 		// its history row tells them apart, so it is never applied twice.
@@ -382,7 +407,7 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 			return fail("history validation", err)
 		}
 		if done {
-			return empty, &DriftError{"source", p.SourceFingerprint, fingerprint(live)}
+			return empty, &DriftError{Phase: "source", Expected: p.SourceFingerprint, Actual: fingerprint(live)}
 		}
 		if err = tx.Rollback(); err != nil {
 			return fail("resume", err)
@@ -438,7 +463,7 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 		return fail("intermediate inspection", err)
 	}
 	if got := fingerprint(live); got != fingerprint(beforeFinal) {
-		return empty, &DriftError{"final", fingerprint(beforeFinal), got}
+		return empty, &DriftError{Phase: "final", Expected: fingerprint(beforeFinal), Actual: got}
 	}
 	if err = prepareHistory(ctx, tx); err != nil {
 		return fail("history validation", err)
@@ -453,7 +478,7 @@ func applyOnline(ctx context.Context, db *sql.DB, p plan.Plan, opts ApplyOptions
 		return fail("target inspection", err)
 	}
 	if got := fingerprint(actual); got != p.TargetFingerprint {
-		return empty, &DriftError{"target", p.TargetFingerprint, got}
+		return empty, targetDrift(p, actual, got)
 	}
 	var token [16]byte
 	if _, err = rand.Read(token[:]); err != nil {

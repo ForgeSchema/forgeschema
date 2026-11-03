@@ -113,10 +113,10 @@ func inspectScan(ctx context.Context, tx *sql.Tx, name string, ix *indexScan) (s
 func checkScope(ctx context.Context, tx *sql.Tx, oid int64, name string) error {
 	// These objects would otherwise be invisible in a table-only snapshot.
 	checks := []struct{ query, feature string }{
-		{`SELECT c.relname FROM pg_catalog.pg_class c WHERE c.relnamespace=$1 AND c.relkind NOT IN ('r','i')
+		{`SELECT c.relname FROM pg_catalog.pg_class c WHERE c.relnamespace=$1 AND c.relkind NOT IN ('r','i','v')
  AND NOT (c.relkind='S' AND EXISTS(SELECT 1 FROM pg_catalog.pg_depend d WHERE d.classid='pg_catalog.pg_class'::regclass
  AND d.objid=c.oid AND d.refclassid='pg_catalog.pg_class'::regclass AND d.deptype='i'))
- ORDER BY c.relname LIMIT 1`, "views, standalone or serial sequences, foreign and partitioned relations are not represented"},
+ ORDER BY c.relname LIMIT 1`, "materialized views, standalone or serial sequences, foreign and partitioned relations are not represented"},
 		{`SELECT typname FROM pg_catalog.pg_type WHERE typnamespace=$1 AND typtype NOT IN ('c','e') AND typelem=0 ORDER BY typname LIMIT 1`, "custom types other than enums, and domains, are not represented"},
 		{`SELECT p.proname FROM pg_catalog.pg_proc p WHERE p.pronamespace=$1 ORDER BY p.proname LIMIT 1`, "functions and procedures are not represented"},
 		{`SELECT collname FROM pg_catalog.pg_collation WHERE collnamespace=$1 ORDER BY collname LIMIT 1`, "custom collations are not represented"},
@@ -199,6 +199,9 @@ func readTablesScan(ctx context.Context, tx *sql.Tx, oid int64, name string, ix 
 			return doc, err
 		}
 		doc.Tables = append(doc.Tables, table)
+	}
+	if doc.Views, err = readViews(ctx, tx, oid, name); err != nil {
+		return doc, err
 	}
 	return doc, nil
 }
