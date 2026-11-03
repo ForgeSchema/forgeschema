@@ -26,4 +26,52 @@ The plan agreed with the owner on 2026-10-18 is done and went out as 0.3.0:
 
 An independent review before the release found a deadlock between an online build and a waiting apply, lock_timeout cancelling builds, unsafe drops of keys a foreign key needs and lossy conversions; all fixed with tests. Results for 0.3.0 are in test/results/ (PostgreSQL 16.15 locally; CI runs 16.10 and 17.6).
 
-What comes next hasn't been decided. Agree it with the owner before it goes here, and start work only when the owner says go.
+## ForgeSchema 0.4: manage real-world schemas (softdev-plan item 24, approved by YK 2026-11-03)
+
+What and why: inspection rejects any schema with an enum, an array column or a view, so many existing PostgreSQL databases can't be managed at all. PostgreSQL 18 (September 2025) isn't tested and the CI minors are old. The reviewable plan is the selling point, but nothing puts it on a pull request. Releases build on Go 1.24, which is out of support.
+
+Design decisions:
+- Phase A, enums and arrays.
+  - A document gains an optional `enums` list: name and ordered `values`. Enum names follow the naming policy and share PostgreSQL's type namespace with tables, so they must not collide with a relation, nor with the `_name` array type a table or enum gets.
+  - Values are 1 to 63 bytes with no control characters, at least one per enum, no repeats.
+  - A column type may name an enum, and any supported base type or enum may be a one-dimensional array: `integer[]`, `character varying(20)[]`, `status[]`.
+  - Defaults:
+    - An enum column takes a quoted literal that is one of its values; PostgreSQL stores it with a cast, which inspection strips.
+    - An array column takes only `'{}'`.
+  - Enum and array columns may sit in keys, unique constraints and indexes. A foreign key needs identical types on both sides. Check expressions on enum or array columns stay outside the grammar and are refused with that reason.
+  - Plans:
+    - `create_enum` runs before tables are created.
+    - New values inserted anywhere keep the old values in order, as `add_enum_value` with BEFORE or AFTER. ALTER TYPE ADD VALUE runs inside the transaction, but PostgreSQL won't let the same transaction use the new value, so a plan whose new defaults use a value added in that plan is blocked with the reason.
+    - Removing or reordering values, dropping an enum still in the source, and type changes into or out of an enum or array are blocked.
+  - Canonical JSON omits `enums` when empty, so existing fingerprints and plan IDs don't change.
+- Phase B, plain views.
+  - A document gains an optional `views` list: name, `query`, and `depends_on`, the tables and views the query reads.
+  - The query is compared as PostgreSQL prints it: pg_get_viewdef with the managed schema as search_path, whitespace outside literals collapsed, and the trailing semicolon dropped.
+  - Apply's existing target verification therefore catches a query written in another form, rolls back, and names the form PostgreSQL wants, so the file converges to the canonical text.
+  - `depends_on` is checked the same way against pg_depend.
+  - Plans:
+    - `create_view` runs in dependency order after every table change.
+    - A changed view, and any view that reads it, is dropped first and created again (`drop_view`, then `create_view`).
+    - A view that reads a table with a renamed, converted or dropped column, directly or through another view, is dropped before the change and created again after it.
+    - A view removed from the target is dropped; it holds no data, and the explanation says so.
+    - In online plans, drops go in the first phase and creates in the final one.
+  - Inspection accepts plain views in the managed schema. Materialized views, views with options or a check option, recursive views, and views reading other schemas are refused with the reason.
+- Phase C, PostgreSQL 18 and the Action.
+  - CI runs PostgreSQL 16, 17 and 18 on their major tags, so it always tests the current minors; the recorded results name the exact versions. Inspection accepts 18, including the NOT NULL constraints that 18 stores in pg_constraint. FEATURES.md and INSPECTION.md say 16 to 18.
+  - A composite `action.yml` downloads the release binary for the runner (pinned to the action's tag, else latest) and checks SHA256SUMS.
+  - The Action runs `plan --explain` against a database URL secret, posts or updates one pull request comment found by a hidden marker, written only by the commenting bot, and fails the step when the plan is blocked. `mode: verify` runs verify after a deploy instead.
+  - Tested by a workflow on Linux with a PostgreSQL service, and on the published binary after each release.
+- Upkeep: go.mod and README to Go 1.26; release and test workflows on that.
+- Version 0.4.0. Done when a schema with enums, arrays and two dependent views round-trips plan, apply and verify, on PostgreSQL 16, 17 and 18.
+
+Steps:
+1. [x] Phase 0: this plan.
+2. [ ] Upkeep: go 1.26, CI on PostgreSQL 16, 17 and 18, inspection on 18.
+3. [ ] Phase A: enums and arrays, tests (schema, plan, inspect, apply, verify on a live server).
+4. [ ] Phase B: views, tests.
+5. [ ] Phase C: the Action and its test workflow; docs (SCHEMA, INSPECTION, PLANNING, APPLY, FEATURES, README, COMMANDS).
+6. [ ] Independent review (at most two rounds), fixes, fresh test/results.
+7. [ ] 0.4.0 released by the workflow; assets checked at the tag and latest; downloaded binary run.
+8. [ ] forgeschema.com post and pages; softdevstudio.com note; softdev-plan item 24 done.
+
+Local note: this cloud session has Go 1.24 and no Go module proxy. Local runs use a scratch modfile with go 1.24 and the two dependencies cloned from GitHub (`GOFLAGS=-modfile=...`), against a disposable PostgreSQL 16.15. CI is the real check, and the only one for 17 and 18.
