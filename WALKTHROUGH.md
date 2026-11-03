@@ -1,6 +1,6 @@
 # Reproduce the prototype
 
-Use a fresh checkout, Go 1.24 or later and an explicitly supplied disposable PostgreSQL 16 or 17 database. The role needs database CREATE permission and exclusive ownership of ForgeSchema metadata. Pause external DDL. This automated demonstration prints its review and executes without an interactive approval pause.
+Use a fresh checkout, Go 1.26 or later and an explicitly supplied disposable PostgreSQL 16, 17 or 18 database. The role needs database CREATE permission and exclusive ownership of ForgeSchema metadata. Pause external DDL. This automated demonstration prints its review and executes without an interactive approval pause.
 
 For the included local fixture, install Docker with Compose:
 

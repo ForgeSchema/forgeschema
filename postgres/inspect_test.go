@@ -20,7 +20,7 @@ func database(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("FORGESCHEMA_TEST_DATABASE_URL")
 	if dsn == "" {
-		t.Skip("set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16/17 database")
+		t.Skip("set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16, 17 or 18 database")
 	}
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {

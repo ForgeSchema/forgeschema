@@ -1,0 +1,396 @@
+name: action-test
+
+# Runs the GitHub Action in this repo (action.yml) with a forgeschema built
+# from this commit, against a PostgreSQL service: a plan from an empty schema
+# (ready), the same after apply (no changes), verify (match), a blocked plan
+# (reported, then failing), drift after a hand edit (failing), an unreachable
+# database and a bad switch (both failing), plus the download path for a
+# published release. The comment job posts plans to a closed issue kept for
+# the purpose, as a pull request run would, and checks a second run updates
+# the same comment. The download jobs run the action on the published
+# binaries, pinned to the newest tag and unpinned; they start by themselves
+# after each release and can be started by hand.
+on:
+  push:
+    branches: [main]
+    paths: [action.yml, .github/workflows/action-test.yml, "cmd/**", "internal/**", "schema/**", "plan/**", "postgres/**", go.mod, "examples/**"]
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag the download jobs pin (vX.Y.Z); empty means the newest release
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  DB: postgres://forgeschema:local_test_only@localhost:5432/forgeschema_test?sslmode=disable
+
+jobs:
+  local:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: forgeschema
+          POSTGRES_PASSWORD: local_test_only
+          POSTGRES_DB: forgeschema_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U forgeschema -d forgeschema_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build forgeschema and an empty schema
+        run: |
+          go build -o "$RUNNER_TEMP/forgeschema" ./cmd/forgeschema
+          echo "FS_BIN=$RUNNER_TEMP/forgeschema" >> "$GITHUB_ENV"
+          psql "$DB" -qXc "CREATE SCHEMA store"
+          # A target that drops a column without saying so: blocked.
+          sed '/- name: notes/,/nullable: true/d' examples/store.yaml > "$RUNNER_TEMP/store-blocked.yaml"
+          grep -q notes "$RUNNER_TEMP/store-blocked.yaml" && { echo "::error::the blocked file still has notes"; exit 1; } || true
+
+      - name: An empty schema gets a ready plan
+        id: fresh
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: Apply it
+        run: DATABASE_URL="$DB" "$FS_BIN" apply "${{ steps.fresh.outputs.plan }}"
+      - name: No changes after the apply
+        id: same
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: Verify matches
+        id: match
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          mode: verify
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: A blocked plan is reported with fail off
+        id: blocked
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: ${{ runner.temp }}/store-blocked.yaml
+          fail: "false"
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: A blocked plan fails the step
+        id: blockfail
+        continue-on-error: true
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: ${{ runner.temp }}/store-blocked.yaml
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: A hand edit
+        run: psql "$DB" -qXc "ALTER TABLE store.products ADD COLUMN colour text"
+      - name: Verify finds the drift
+        id: drift
+        continue-on-error: true
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          mode: verify
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: An unreachable database keeps its password out of the report
+        id: unreachable
+        continue-on-error: true
+        uses: ./
+        with:
+          database-url: postgres://app:hunter22secret@127.0.0.1:1/app?sslmode=disable&connect_timeout=2
+          schema: examples/store.yaml
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: A bad switch fails the step
+        id: badswitch
+        continue-on-error: true
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          fail: "flase"
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: A published release through the download path
+        id: published
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/shop.yaml
+          version: v0.3.0
+      - name: The latest release, resolved to its tag
+        id: latest
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/shop.yaml
+          version: latest
+      - name: Check
+        env:
+          BLOCKED: ${{ steps.blocked.outputs.report }}
+          DRIFT: ${{ steps.drift.outputs.report }}
+          UNREACHABLE: ${{ steps.unreachable.outputs.report }}
+          FRESH: ${{ steps.fresh.outputs.report }}
+        run: |
+          set -u
+          bad=0
+          want() { if [ "$2" != "$3" ]; then echo "::error::$1: got $2, want $3"; bad=1; fi; }
+          want "fresh" "${{ steps.fresh.outputs.exit-code }} ${{ steps.fresh.outputs.result }}" "0 ready"
+          want "same" "${{ steps.same.outputs.exit-code }} ${{ steps.same.outputs.result }}" "0 no-changes"
+          want "match" "${{ steps.match.outputs.exit-code }} ${{ steps.match.outputs.result }}" "0 match"
+          want "blocked" "${{ steps.blocked.outputs.exit-code }} ${{ steps.blocked.outputs.result }} ${{ steps.blocked.outcome }}" "3 blocked success"
+          want "blocked, failing" "${{ steps.blockfail.outputs.result }} ${{ steps.blockfail.outcome }}" "blocked failure"
+          want "drift" "${{ steps.drift.outputs.exit-code }} ${{ steps.drift.outputs.result }} ${{ steps.drift.outcome }}" "4 drift failure"
+          want "unreachable" "${{ steps.unreachable.outputs.result }} ${{ steps.unreachable.outcome }}" "error failure"
+          want "bad switch" "${{ steps.badswitch.outputs.result }} ${{ steps.badswitch.outcome }}" "error failure"
+          want "published" "${{ steps.published.outputs.result }} ${{ steps.published.outputs.version }}" "ready v0.3.0"
+          want "latest" "${{ steps.latest.outputs.result }} ${{ steps.latest.outputs.version }}" "ready latest"
+          want "version" "${{ steps.fresh.outputs.version }}" "local"
+          want "no comment on a push" "${{ steps.fresh.outputs.comment-url }}" ""
+          if grep -q hunter22secret "$UNREACHABLE" "$GITHUB_STEP_SUMMARY"; then echo "::error::the password is in the report"; bad=1; fi
+          grep -q "couldn't plan" "$UNREACHABLE" || { echo "::error::no error in the report"; cat "$UNREACHABLE"; bad=1; }
+          grep -q 'CREATE VIEW "store"."open_totals"' "$FRESH" || { echo "::error::the ready report has no SQL"; cat "$FRESH"; bad=1; }
+          grep -q 'Blocked orders.notes' "$BLOCKED" || { echo "::error::the blocked report doesn't name the column"; cat "$BLOCKED"; bad=1; }
+          grep -q '"column_unexpected"' "$DRIFT" || { echo "::error::the drift report doesn't name the column"; cat "$DRIFT"; bad=1; }
+          exit $bad
+
+  # The comment as a pull request run posts it, on a closed issue kept for
+  # these runs (a pull request is an issue to the comments API).
+  comment:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: forgeschema
+          POSTGRES_PASSWORD: local_test_only
+          POSTGRES_DB: forgeschema_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U forgeschema -d forgeschema_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build forgeschema, a schema and the issue
+        run: |
+          go build -o "$RUNNER_TEMP/forgeschema" ./cmd/forgeschema
+          echo "FS_BIN=$RUNNER_TEMP/forgeschema" >> "$GITHUB_ENV"
+          psql "$DB" -qXc "CREATE SCHEMA store"
+          title="Action test: plan comments"
+          n=$(gh api "repos/$GITHUB_REPOSITORY/issues?state=all&per_page=100" --jq ".[] | select(.title == \"$title\" and .pull_request == null) | .number" | head -n 1)
+          if [ -z "$n" ]; then
+            n=$(gh api -X POST "repos/$GITHUB_REPOSITORY/issues" -f title="$title" \
+              -f body="The action-test workflow posts plans here, the way the action comments on a pull request. Closed on purpose." --jq .number)
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/$n" -f state=closed > /dev/null
+          fi
+          echo "ISSUE=$n" >> "$GITHUB_ENV"
+      - name: First run posts or updates the plan comment
+        id: one
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          pull-request: ${{ env.ISSUE }}
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: Second run updates the same comment
+        id: two
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          pull-request: ${{ env.ISSUE }}
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: Verify gets a comment of its own
+        id: other
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          mode: verify
+          fail: "false"
+          pull-request: ${{ env.ISSUE }}
+          forgeschema-path: ${{ env.FS_BIN }}
+      - name: Check
+        run: |
+          set -u
+          bad=0
+          one="${{ steps.one.outputs.comment-id }}"; two="${{ steps.two.outputs.comment-id }}"; other="${{ steps.other.outputs.comment-id }}"
+          [ -n "$one" ] || { echo "::error::no comment was posted"; exit 1; }
+          [ "$one" = "$two" ] || { echo "::error::the second run posted a new comment ($two, not $one)"; bad=1; }
+          [ -n "$other" ] && [ "$other" != "$one" ] || { echo "::error::verify shares the plan's comment"; bad=1; }
+          marker="<!-- forgeschema-plan schema=examples/store.yaml -->"
+          body=$(gh api "repos/$GITHUB_REPOSITORY/issues/comments/$one" --jq .body)
+          case "$body" in "$marker"*) ;; *) echo "::error::the comment has no marker"; bad=1 ;; esac
+          printf '%s' "$body" | grep -q 'CREATE TABLE' || { echo "::error::the comment has no plan"; printf '%s\n' "$body"; bad=1; }
+          count=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --jq "[.[] | select(.body | startswith(\"$marker\"))] | length" | awk '{n += $1} END {print n + 0}')
+          [ "$count" = 1 ] || { echo "::error::$count plan comments, want 1"; bad=1; }
+          exit $bad
+
+  # The release workflow runs after every green test run on main but
+  # publishes only when the version is new. Go on only when the newest
+  # release was made from the commit that run was for.
+  fresh:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.f.outputs.go }}
+    steps:
+      - id: f
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then echo "go=yes" >> "$GITHUB_OUTPUT"; exit 0; fi
+          tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
+          if [ "$sha" = "$HEAD_SHA" ]; then echo "go=yes" >> "$GITHUB_OUTPUT"; else echo "go=no" >> "$GITHUB_OUTPUT"; echo "No new release for $HEAD_SHA (newest is $tag)"; fi
+
+  # The published binary through the action, against a real database:
+  # pinned to the tag (an empty version means the tag's own), and latest.
+  download:
+    needs: fresh
+    if: needs.fresh.outputs.go == 'yes'
+    strategy:
+      fail-fast: false
+      matrix:
+        pin: [tag, latest]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: forgeschema
+          POSTGRES_PASSWORD: local_test_only
+          POSTGRES_DB: forgeschema_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U forgeschema -d forgeschema_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - name: Pick the version
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAG:-}" ]; then TAG=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name); fi
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::bad tag $TAG"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [ "${{ matrix.pin }}" = tag ]; then echo "version=" >> "$GITHUB_OUTPUT"; else echo "version=latest" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pick.outputs.tag }}
+      - run: psql "$DB" -qXc "CREATE SCHEMA store"
+      - name: Plan through the published binary
+        id: plan
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          version: ${{ steps.pick.outputs.version }}
+      - name: Apply, then verify through the published binary
+        run: DATABASE_URL="$DB" "$RUNNER_TEMP/forgeschema-bin/unpacked/"*/forgeschema apply "${{ steps.plan.outputs.plan }}"
+      - name: Verify
+        id: verify
+        uses: ./
+        with:
+          database-url: ${{ env.DB }}
+          schema: examples/store.yaml
+          mode: verify
+          version: ${{ steps.pick.outputs.version }}
+      - name: Check
+        env:
+          TAG: ${{ steps.pick.outputs.tag }}
+        run: |
+          set -u
+          bad=0
+          want() { if [ "$2" != "$3" ]; then echo "::error::$1: got $2, want $3"; bad=1; fi; }
+          want "plan" "${{ steps.plan.outputs.result }}" ready
+          want "verify" "${{ steps.verify.outputs.result }}" match
+          if [ "${{ matrix.pin }}" = tag ]; then want "version" "${{ steps.plan.outputs.version }}" "$TAG"; else want "version" "${{ steps.plan.outputs.version }}" latest; fi
+          "$RUNNER_TEMP/forgeschema-bin/unpacked/"*/forgeschema version | grep -Fx "${TAG#v}" || { echo "::error::the binary is not $TAG"; bad=1; }
+          exit $bad
+
+  # The install path on macOS and Windows, which have no database service:
+  # the download, checksum and unpack work, and the run reports the
+  # unreachable database as an error.
+  download-install:
+    needs: fresh
+    if: needs.fresh.outputs.go == 'yes'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Pick the version
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAG:-}" ]; then TAG=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name); fi
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::bad tag $TAG"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pick.outputs.tag }}
+      - name: Install and run against no database
+        id: run
+        continue-on-error: true
+        uses: ./
+        with:
+          database-url: postgres://nobody@127.0.0.1:1/none?sslmode=disable&connect_timeout=2
+          schema: examples/store.yaml
+      - name: Check
+        env:
+          TAG: ${{ steps.pick.outputs.tag }}
+        run: |
+          set -u
+          bad=0
+          [ "${{ steps.run.outputs.version }}" = "$TAG" ] || { echo "::error::version ${{ steps.run.outputs.version }}, want $TAG"; bad=1; }
+          [ "${{ steps.run.outputs.result }}" = error ] || { echo "::error::result ${{ steps.run.outputs.result }}, want error"; bad=1; }
+          ext=""; [ "$RUNNER_OS" = Windows ] && ext=.exe
+          "$RUNNER_TEMP/forgeschema-bin/unpacked/"*/forgeschema$ext version | tr -d '\r' | grep -Fx "${TAG#v}" || { echo "::error::the binary is not $TAG"; bad=1; }
+          exit $bad

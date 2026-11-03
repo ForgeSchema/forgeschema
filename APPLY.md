@@ -1,6 +1,6 @@
 # Execute a reviewed migration plan
 
-ForgeSchema applies an exact supported plan, without recalculating a different migration at execution time. This is a development prototype supporting PostgreSQL 16 and 17, not a production-readiness claim. The operator must pause external DDL in the managed schema and keep database-wide hooks/dependencies outside the supported contract under control. Existing-table locks do not protect an entire schema namespace against unrelated CREATEs; ForgeSchema cannot certify external DDL quiescence.
+ForgeSchema applies an exact supported plan, without recalculating a different migration at execution time. This is a development prototype supporting PostgreSQL 16, 17 and 18, not a production-readiness claim. The operator must pause external DDL in the managed schema and keep database-wide hooks/dependencies outside the supported contract under control. Existing-table locks do not protect an entire schema namespace against unrelated CREATEs; ForgeSchema cannot certify external DDL quiescence.
 
 ```sh
 # DATABASE_URL is already set securely in the environment.
@@ -18,7 +18,7 @@ The apply command reads a JSON plan file and uses DATABASE_URL from the environm
 | 1 | Invalid input, or a lock, SQL or history failure; the transaction was not committed (for an online plan, the message says when its first phase was, and the plan can be resumed). The message names the stage and includes PostgreSQL's message and SQLSTATE, for example a lock timeout (55P03), NULLs found by SET NOT NULL (23502) or duplicates found by a unique constraint (23505). PostgreSQL's detail line is left out because it can quote row values, such as the duplicated key. |
 | 2 | Usage or configuration error, including missing DATABASE_URL or an invalid timeout. |
 | 3 | The artifact is a blocked plan. |
-| 5 | Drift: the live source no longer matches the reviewed plan (inspect again and build a new plan), or the result didn't match the reviewed target, usually because of concurrent DDL. Nothing was committed. |
+| 5 | Drift: the live source no longer matches the reviewed plan (inspect again and build a new plan), or the result didn't match the reviewed target, usually because of concurrent DDL or a view query written in another form than PostgreSQL stores; the message lists the differences and, for a view, the stored form to copy into the file. Nothing was committed. |
 | 6 | The commit outcome is unknown; see below. |
 
 Connection failures while starting the transaction, and authentication or missing-database errors, are reported generically, because their messages can echo connection details.

@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -248,5 +249,34 @@ func TestViewDocumentRules(t *testing.T) {
 	empty, _ := schema.Load(strings.NewReader(base))
 	if j, _ := empty.CanonicalJSON(); strings.Contains(string(j), "views") {
 		t.Fatal("empty views appear in canonical JSON")
+	}
+}
+
+// The 0.4 example: enums, arrays and two dependent views round-trip plan,
+// apply, inspect and verify.
+func TestStoreExampleRoundTrip(t *testing.T) {
+	db := database(t)
+	name := isolated(t, db)
+	raw, err := os.ReadFile("../examples/store.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := enumDocument(t, name, strings.SplitN(string(raw), "schema: store\n", 2)[1])
+	p := applyPlan(t, name, want)
+	if p.Operations[0].Kind != "create_enum" || p.Operations[len(p.Operations)-1].Subject != "open_totals" {
+		t.Fatalf("operations: %s", kinds(p))
+	}
+	got, err := postgres.Inspect(context.Background(), db, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _ := got.CanonicalJSON()
+	b, _ := want.CanonicalJSON()
+	if string(a) != string(b) {
+		t.Fatalf("inspect differs\n got  %s\n want %s", a, b)
+	}
+	again, err := plan.Build(got, want, nil)
+	if err != nil || again.Status != "ready" || len(again.Operations) != 0 {
+		t.Fatalf("second plan: %+v %v", again, err)
 	}
 }

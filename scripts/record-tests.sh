@@ -8,7 +8,7 @@
 # The database must be disposable: the tests create and drop schemas and roles.
 set -eu
 cd "$(dirname "$0")/.."
-: "${FORGESCHEMA_TEST_DATABASE_URL:?set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16 or 17}"
+: "${FORGESCHEMA_TEST_DATABASE_URL:?set FORGESCHEMA_TEST_DATABASE_URL to a disposable PostgreSQL 16, 17 or 18}"
 out=test/results
 mkdir -p "$out"
 server=$(psql -X -At "$FORGESCHEMA_TEST_DATABASE_URL" -c 'SHOW server_version' 2>/dev/null || echo unknown)

@@ -1,6 +1,6 @@
 # Schema contract, version 1
 
-A document contains required version: 1, a schema name and a tables sequence. Use tables: [] for an empty managed schema. A table has a name, a nonempty columns sequence and optional primary_key, unique, indexes, foreign_keys and checks. [examples/shop.yaml](examples/shop.yaml) uses every part of the contract.
+A document contains required version: 1, a schema name and a tables sequence, and optional enums and views sequences. Use tables: [] for an empty managed schema. A table has a name, a nonempty columns sequence and optional primary_key, unique, indexes, foreign_keys and checks. [examples/shop.yaml](examples/shop.yaml) uses every part of the table contract; [examples/store.yaml](examples/store.yaml) adds enums, arrays and two views, one reading the other.
 
 Names are lower-case ASCII letters, digits and underscores; they must start with a letter or underscore and fit PostgreSQL's 63-byte limit. Names beginning pg_ or forgeschema_ and information_schema are reserved. The inspector uses the same naming policy; identifiers outside it are unsupported, not silently renamed. At most 1600 columns per table and 32 columns per key, constraint or index are accepted.
 
@@ -27,6 +27,20 @@ A default is a YAML string, because the YAML reader never coerces scalars. Only 
 Function names are case-insensitive and stored in lower case. Numeric literals must fit the column exactly: no more fractional digits than a numeric scale (rounding would change the value) and no more whole digits than precision minus scale. Negative zero, leading zeros, exponents, backslashes in string literals, string literals longer than a varchar/char length, expressions, casts and other functions are rejected. Backslashes are excluded because a server running with standard_conforming_strings off would read them as escapes. bytea has no supported default.
 
 identity is always or by_default and maps to GENERATED ALWAYS / BY DEFAULT AS IDENTITY. It needs a smallint, integer or bigint column that is not nullable and has no default. PostgreSQL creates the sequence TABLE_COLUMN_seq with default options; that name is reserved and must fit 63 bytes. serial columns are not supported; use identity.
+
+## Enums and arrays
+
+enums is a sequence of enum types, each with a name and its ordered values:
+
+```yaml
+enums:
+- name: order_state
+  values: [open, paid, shipped]
+```
+
+An enum needs at least one value. Values are 1 to 63 bytes of UTF-8 without control characters, with no repeats; their order is significant. Enum names follow the naming policy above and may not be a built-in type name. PostgreSQL gives every table and every enum a type of the same name, and an array type named with a leading underscore, so a table, view or enum may not share a name, or take the _NAME of another.
+
+A column type may name an enum of the schema (type: order_state). Any supported type or enum may be a one-dimensional array: text[], integer[], varchar(20)[], order_state[]; a space before [] is allowed. Multidimensional arrays are not represented. An enum column's default is a quoted value of that enum ("'open'"); an array column's only default is "'{}'". Enum and array columns may be in keys, unique constraints and indexes; a foreign key needs the same type on both sides. Check constraints on enum or array columns are outside the grammar below.
 
 ## Keys, constraints and indexes
 
@@ -56,10 +70,28 @@ The canonical spelling puts single spaces around operators, writes AND and IN in
 
 Primary key, unique constraint, index and identity sequence names share PostgreSQL's per-schema relation namespace and must not collide with each other or with tables. Foreign key and check names must be unique within their table and differ from its primary key and unique constraint names.
 
+## Views
+
+views is a sequence of plain views, each with a name, its query and depends_on, the tables and views of the schema the query reads:
+
+```yaml
+views:
+- name: open_orders
+  query: >-
+    SELECT o.id, o.quantity, p.sku, p.price
+    FROM orders o JOIN products p ON p.id = o.product_id
+    WHERE o.state = 'open'::order_state
+  depends_on: [orders, products]
+```
+
+The query is compared as PostgreSQL prints it: pg_get_viewdef, with pg_catalog and then the managed schema on the search path, so the schema's own tables appear unqualified. Runs of spaces, tabs and line breaks outside quotes become one space, and a trailing semicolon is dropped, so the query may be wrapped over lines. Anything else must match: PostgreSQL writes keywords in capitals, adds casts such as 'open'::order_state and turns LIKE into ~~. A query written another way still plans and runs, but apply then finds the result differs from the target, rolls back, and prints the form PostgreSQL stored; copy it into the file. forgeschema inspect prints every view in that form.
+
+A query is one statement: a semicolon may only end it. Comments, $ (dollar quotes and parameters), backslashes, control characters, and tabs or line breaks inside quotes are refused, as is a query over 64 KiB. depends_on must name tables and views of the schema, without repeats or the view itself, and views may not depend on each other in a cycle; apply checks it against the dependencies PostgreSQL records. Views are in the relation namespace with tables, indexes and sequences.
+
 ## Strict reading and canonical form
 
-The YAML reader rejects unknown and duplicate fields, null values, multiple documents, custom tags, anchors, aliases and scalar coercion (quote-looking booleans and numbers do not become booleans or numbers automatically). The input limit is 1 MiB. Documents constructed directly in Go are validated too. Canonical JSON sorts tables, columns, constraints and indexes by name but preserves column order inside keys, constraints and indexes. no_action actions are omitted. Physical column order is outside this contract. SHA-256 fingerprints cover canonical JSON, including the contract version. Fingerprints detect representation differences; they are not signatures or plan authorization. Documents that use none of the newer fields have the same canonical JSON and fingerprint as in 0.1.
+The YAML reader rejects unknown and duplicate fields, null values, multiple documents, custom tags, anchors, aliases and scalar coercion (quote-looking booleans and numbers do not become booleans or numbers automatically). The input limit is 1 MiB. Documents constructed directly in Go are validated too. Canonical JSON sorts enums, tables, views, columns, constraints and indexes by name, keeps enum values in order, sorts depends_on but preserves column order inside keys, constraints and indexes. no_action actions are omitted. Physical column order is outside this contract. SHA-256 fingerprints cover canonical JSON, including the contract version. Fingerprints detect representation differences; they are not signatures or plan authorization. Empty enums and views are left out, so documents that use none of the newer fields have the same canonical JSON and fingerprint as in 0.1.
 
-Explicit rename intent is supplied through the separate versioned mapping file described in PLANNING.md; schema files themselves have no rename field. Read-only PostgreSQL 16/17 inspection maps supported catalog objects to this contract and rejects unsupported structures; see INSPECTION.md. Offline SQL generation is available through the planner. Supported reviewed plans can be executed transactionally through apply; see APPLY.md.
+Explicit rename intent is supplied through the separate versioned mapping file described in PLANNING.md; schema files themselves have no rename field. Read-only PostgreSQL 16, 17 and 18 inspection maps supported catalog objects to this contract and rejects unsupported structures; see INSPECTION.md. Offline SQL generation is available through the planner. Supported reviewed plans can be executed transactionally through apply; see APPLY.md.
 
-Not represented: generated columns, timestamp/time precision, arrays, enums, domains, custom collations, check constraints outside the grammar above, exclusion constraints, deferrable constraints, cross-schema foreign keys, MATCH FULL, partial, expression, INCLUDE and non-btree indexes, and index options.
+Not represented: generated columns, timestamp/time precision, multidimensional arrays, other custom types, domains, materialized views, views with options, triggers or rules, custom collations, check constraints outside the grammar above, exclusion constraints, deferrable constraints, cross-schema foreign keys, MATCH FULL, partial, expression, INCLUDE and non-btree indexes, and index options.

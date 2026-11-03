@@ -1,0 +1,295 @@
+name: ForgeSchema plan
+description: Post the reviewed migration plan from a PostgreSQL schema to the schema file on a pull request, and fail the check when the plan is blocked. Or verify a database against the file after a deploy.
+author: ForgeSchema
+branding:
+  icon: database
+  color: blue
+
+inputs:
+  database-url:
+    description: "The database, as DATABASE_URL takes it (postgres://...). Pass it from a secret. The action only reads catalog metadata; it never applies anything."
+    required: true
+  schema:
+    description: The schema file (YAML) to plan to or verify against, relative to the workspace. Its schema field names the PostgreSQL schema to inspect.
+    required: true
+  changes:
+    description: An optional change file (renames, drops, conversions), relative to the workspace.
+    required: false
+    default: ""
+  mode:
+    description: "plan (inspect the database, then plan to the file) or verify (check the database matches the file, after a deploy)"
+    required: false
+    default: plan
+  online:
+    description: Plan with --online, building indexes on existing tables concurrently.
+    required: false
+    default: "false"
+  comment:
+    description: Post the result as a pull request comment (one per schema file and mode, updated on every run). Only when there is a pull request.
+    required: false
+    default: "true"
+  fail:
+    description: Fail the step when the plan is blocked or verify finds drift. Set to false to report only. An error always fails.
+    required: false
+    default: "true"
+  version:
+    description: "ForgeSchema release to use (v0.4.0 or later), or latest. Empty means the release this action belongs to (ForgeSchema/forgeschema@v0.4.0 runs 0.4.0), or the latest when that one isn't published."
+    required: false
+    default: ""
+  pull-request:
+    description: The pull request to comment on. Empty means the one the event is for; a push event has none, so nothing is posted.
+    required: false
+    default: ""
+  comment-author:
+    description: The account the token posts as, whose comment is updated on the next run. The default token posts as github-actions[bot]; set this when github-token is another account's.
+    required: false
+    default: github-actions[bot]
+  github-token:
+    description: Token for the comment. The default token can comment on pull requests from the same repository; from a fork it can't, and the step only warns.
+    required: false
+    default: ${{ github.token }}
+  forgeschema-path:
+    description: Use this forgeschema binary instead of downloading one (for testing the action itself).
+    required: false
+    default: ""
+
+outputs:
+  result:
+    description: "ready, no-changes, blocked, match, drift or error"
+    value: ${{ steps.run.outputs.result }}
+  exit-code:
+    description: "The command's exit code: 0 ready, no changes or match, 3 blocked, 4 drift, other values an error"
+    value: ${{ steps.run.outputs.exit-code }}
+  report:
+    description: File holding the result as Markdown, as posted
+    value: ${{ steps.run.outputs.report }}
+  plan:
+    description: File holding the plan JSON (plan mode, when the plan was made), ready for forgeschema apply
+    value: ${{ steps.run.outputs.plan }}
+  version:
+    description: The release the action ran (a vX.Y.Z tag, latest, or local)
+    value: ${{ steps.install.outputs.version }}
+  comment-url:
+    description: The pull request comment, when one was posted or updated
+    value: ${{ steps.comment.outputs.url }}
+  comment-id:
+    description: The comment's id, when one was posted or updated
+    value: ${{ steps.comment.outputs.id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install forgeschema
+      id: install
+      shell: bash
+      env:
+        FS_VERSION: ${{ inputs.version }}
+        FS_PATH: ${{ inputs.forgeschema-path }}
+      run: |
+        set -euo pipefail
+        if [ -n "$FS_PATH" ]; then
+          "$FS_PATH" version
+          echo "bin=$FS_PATH" >> "$GITHUB_OUTPUT"
+          echo "version=local" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        # The release this copy of the action belongs to is the Version in
+        # its own source, which a tag of this repository carries.
+        own=""
+        if [ -z "$FS_VERSION" ]; then
+          own=$(sed -n 's/^const Version = "\([0-9][0-9.]*\)"$/v\1/p' "$GITHUB_ACTION_PATH/internal/cli/cli.go")
+          FS_VERSION="${own:-latest}"
+        fi
+        if [ "$FS_VERSION" != latest ] && ! [[ "$FS_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::version must be latest or a vX.Y.Z tag, not $FS_VERSION"; exit 1
+        fi
+        case "$RUNNER_OS" in
+          Linux) os=linux ;; macOS) os=darwin ;; Windows) os=windows ;;
+          *) echo "::error::forgeschema has no build for $RUNNER_OS"; exit 1 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=amd64 ;; ARM64) arch=arm64 ;;
+          *) echo "::error::forgeschema has no build for $RUNNER_ARCH"; exit 1 ;;
+        esac
+        ext=tar.gz; [ "$os" = windows ] && ext=zip
+        name="forgeschema_${os}_${arch}.${ext}"
+        dir="$RUNNER_TEMP/forgeschema-bin"
+        rm -rf "$dir"
+        mkdir -p "$dir"
+        cd "$dir"
+        # latest is resolved to one tag first, so the archive and SHA256SUMS
+        # come from the same release even if one is published meanwhile.
+        resolve() {
+          if [ "$1" != latest ]; then echo "$1"; return; fi
+          curl -fsSLI --retry 3 -o /dev/null -w '%{url_effective}' https://github.com/ForgeSchema/forgeschema/releases/latest | sed 's#.*/tag/##'
+        }
+        get() { curl -fsSL --retry 3 -o "$2" "https://github.com/ForgeSchema/forgeschema/releases/download/$1/$2"; }
+        tag=$(resolve "$FS_VERSION") || tag=""
+        if [ -n "$tag" ] && get "$tag" "$name"; then :
+        elif [ -n "$own" ] && [ "$FS_VERSION" = "$own" ]; then
+          # A copy of the action from main can name a version not published yet.
+          echo "::notice::$FS_VERSION isn't published; using the latest release"
+          FS_VERSION=latest
+          tag=$(resolve latest) || tag=""
+          [ -n "$tag" ] && get "$tag" "$name" || { echo "::error::could not download the latest $name"; exit 1; }
+        else
+          echo "::error::could not download $name of $FS_VERSION"; exit 1
+        fi
+        if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "::error::latest resolved to $tag, not a release tag"; exit 1; fi
+        get "$tag" SHA256SUMS || { echo "::error::could not download SHA256SUMS of $tag"; exit 1; }
+        want=$(awk -v n="$name" '$2==n || $2=="*"n {print $1}' SHA256SUMS)
+        if command -v sha256sum >/dev/null; then got=$(sha256sum "$name" | cut -d' ' -f1); else got=$(shasum -a 256 "$name" | cut -d' ' -f1); fi
+        if [ -z "$want" ] || [ "$want" != "$got" ]; then echo "::error::$name does not match SHA256SUMS"; exit 1; fi
+        mkdir unpacked
+        if [ "$ext" = zip ]; then unzip -oq "$name" -d unpacked; bin=$(ls "$dir"/unpacked/*/forgeschema.exe); else tar -xzf "$name" -C unpacked; bin=$(ls "$dir"/unpacked/*/forgeschema); fi
+        "$bin" version
+        echo "bin=$bin" >> "$GITHUB_OUTPUT"
+        echo "version=$FS_VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Plan or verify
+      id: run
+      shell: bash
+      env:
+        FS_BIN: ${{ steps.install.outputs.bin }}
+        IN_DB: ${{ inputs.database-url }}
+        IN_SCHEMA: ${{ inputs.schema }}
+        IN_CHANGES: ${{ inputs.changes }}
+        IN_MODE: ${{ inputs.mode }}
+        IN_ONLINE: ${{ inputs.online }}
+        IN_FAIL: ${{ inputs.fail }}
+        IN_COMMENT: ${{ inputs.comment }}
+      run: |
+        # The runner starts bash with -e; a blocked plan exits 3 and must not
+        # end the step before the exit code is recorded.
+        set +e -u
+        tmp="$RUNNER_TEMP/forgeschema-$GITHUB_ACTION"
+        rm -rf "$tmp"; mkdir -p "$tmp"
+        report="$tmp/report.md"
+        echo "report=$report" >> "$GITHUB_OUTPUT"
+        error() {
+          echo "exit-code=${2:-1}" >> "$GITHUB_OUTPUT"; echo "result=error" >> "$GITHUB_OUTPUT"
+          # The error, never the database URL, goes into the comment. The
+          # command keeps connection details out of its errors; this is a
+          # second guard, since the comment can be public.
+          msg=$(printf '%s' "$1" | head -c 4000)
+          if [ -n "$IN_DB" ]; then msg=${msg//"$IN_DB"/the database}; fi
+          echo "::error::forgeschema: $msg"
+          { echo "**ForgeSchema couldn't $IN_MODE** \`$IN_SCHEMA\`:"; echo; echo '````'; printf '%s\n' "$msg"; echo '````'; } > "$report"
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; fi
+          exit 0
+        }
+        # A typo in a switch must not let a blocked plan pass, so only true
+        # and false count.
+        for v in "fail=$IN_FAIL" "comment=$IN_COMMENT" "online=$IN_ONLINE"; do
+          case "${v#*=}" in true|false) ;; *) error "${v%%=*} must be true or false, not ${v#*=}" ;; esac
+        done
+        case "$IN_MODE" in plan|verify) ;; *) error "mode must be plan or verify, not $IN_MODE" ;; esac
+        # A URL is masked in the log even when it wasn't passed from a secret.
+        if [ -n "$IN_DB" ]; then echo "::add-mask::$IN_DB"; else error "database-url is required"; fi
+        export DATABASE_URL="$IN_DB"
+        "$FS_BIN" validate "$IN_SCHEMA" > "$tmp/target.json" 2> "$tmp/err" || error "$(cat "$tmp/err")"
+        name=$(sed -n 's/^{"version":1,"schema":"\([a-z0-9_]*\)".*/\1/p' "$tmp/target.json")
+        [ -n "$name" ] || error "could not read the schema name from $IN_SCHEMA"
+        if [ "$IN_MODE" = verify ]; then
+          "$FS_BIN" verify "$IN_SCHEMA" > "$tmp/verify.json" 2> "$tmp/err"
+          code=$?
+          case $code in 0) result=match ;; 4) result=drift ;; *) error "$(cat "$tmp/err")" "$code" ;; esac
+          {
+            if [ "$result" = match ]; then
+              echo "**ForgeSchema verify: match.** Schema \`$name\` matches \`$IN_SCHEMA\`."
+            else
+              echo "**ForgeSchema verify: drift.** Schema \`$name\` differs from \`$IN_SCHEMA\`:"
+              echo
+              echo '````json'
+              cat "$tmp/verify.json"
+              echo '````'
+            fi
+          } > "$report"
+        else
+          "$FS_BIN" inspect "$name" > "$tmp/current.json" 2> "$tmp/err" || error "$(cat "$tmp/err")"
+          args=()
+          [ "$IN_ONLINE" = true ] && args+=(--online)
+          args+=("$tmp/current.json" "$IN_SCHEMA")
+          [ -n "$IN_CHANGES" ] && args+=("$IN_CHANGES")
+          "$FS_BIN" plan "${args[@]}" > "$tmp/plan.json" 2> "$tmp/err"
+          code=$?
+          case $code in 0|3) ;; *) error "$(cat "$tmp/err")" "$code" ;; esac
+          "$FS_BIN" plan --explain "${args[@]}" > "$tmp/plan.txt" 2> "$tmp/err"
+          [ $? = $code ] || error "$(cat "$tmp/err")"
+          echo "plan=$tmp/plan.json" >> "$GITHUB_OUTPUT"
+          if [ $code = 3 ]; then result=blocked
+          elif grep -q '^No schema changes\.$' "$tmp/plan.txt"; then result=no-changes
+          else result=ready; fi
+          {
+            case $result in
+              ready) echo "**ForgeSchema plan for \`$IN_SCHEMA\`: ready.** Review the SQL; applying it to schema \`$name\` gives the file's schema." ;;
+              no-changes) echo "**ForgeSchema plan for \`$IN_SCHEMA\`: no changes.** Schema \`$name\` already matches the file." ;;
+              blocked) echo "**ForgeSchema plan for \`$IN_SCHEMA\`: blocked.** These changes can't be planned safely as written:" ;;
+            esac
+            echo
+            echo '````text'
+            head -c 60000 "$tmp/plan.txt"
+            [ "$(wc -c < "$tmp/plan.txt")" -gt 60000 ] && printf '\n... (cut; the whole plan is in the job log)\n'
+            echo '````'
+          } > "$report"
+          cat "$tmp/plan.txt"
+        fi
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        echo "result=$result" >> "$GITHUB_OUTPUT"
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; fi
+        exit 0
+
+    - name: Comment on the pull request
+      id: comment
+      if: ${{ inputs.comment == 'true' && (inputs.pull-request || github.event.pull_request.number) && steps.run.outputs.report != '' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        AUTHOR: ${{ inputs.comment-author }}
+        PR: ${{ inputs.pull-request || github.event.pull_request.number }}
+        REPORT: ${{ steps.run.outputs.report }}
+        IN_SCHEMA: ${{ inputs.schema }}
+        IN_MODE: ${{ inputs.mode }}
+      run: |
+        set -uo pipefail
+        # One comment per schema file and mode, found again by a marker it
+        # carries. The file name can't end the HTML comment.
+        marker="<!-- forgeschema-$(printf '%s' "$IN_MODE" | tr -cd 'a-z') schema=$(printf '%s' "$IN_SCHEMA" | tr -s '-' | sed 's/-*>/>/g') -->"
+        body="$RUNNER_TEMP/forgeschema-comment-$GITHUB_ACTION.md"
+        { echo "$marker"; cat "$REPORT"; } > "$body"
+        api="repos/$GITHUB_REPOSITORY/issues"
+        # Only a comment the same author posted counts, so nobody else can
+        # claim the marker and hide the plan.
+        if ! list=$(gh api --paginate "$api/$PR/comments"); then
+          echo "::warning::couldn't read the pull request's comments; the result is in the job summary"
+          exit 0
+        fi
+        id=$(printf '%s' "$list" | jq -r --arg m "$marker" --arg a "$AUTHOR" '.[] | select(.user.login == $a and (.body | startswith($m))) | .id' | head -n 1)
+        if [ -n "$id" ]; then
+          url=$(gh api -X PATCH "$api/comments/$id" -F "body=@$body" --jq .html_url)
+        else
+          url=$(gh api -X POST "$api/$PR/comments" -F "body=@$body" --jq .html_url)
+        fi
+        if [ -z "$url" ]; then
+          echo "::warning::couldn't comment on the pull request (a pull request from a fork gets a read-only token); the result is in the job summary"
+          exit 0
+        fi
+        echo "url=$url" >> "$GITHUB_OUTPUT"
+        echo "id=${url##*issuecomment-}" >> "$GITHUB_OUTPUT"
+        echo "Comment: $url"
+
+    - name: Verdict
+      shell: bash
+      env:
+        RESULT: ${{ steps.run.outputs.result }}
+        FAIL: ${{ inputs.fail }}
+      run: |
+        case "$RESULT" in
+          ready) echo "forgeschema: the plan is ready to review" ;;
+          no-changes) echo "forgeschema: the database already matches the file" ;;
+          match) echo "forgeschema: the database matches the file" ;;
+          blocked|drift)
+            if [ "$FAIL" = true ]; then echo "::error::forgeschema: $RESULT; see the report above"; exit 1; fi
+            echo "forgeschema: $RESULT (fail: false, so the step passes)" ;;
+          *) echo "::error::forgeschema couldn't finish; see the log above"; exit 1 ;;
+        esac

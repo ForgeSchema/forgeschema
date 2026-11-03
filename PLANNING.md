@@ -84,7 +84,11 @@ The Go API is plan.Build(source, target, renames), or plan.BuildWith with plan.O
 
 ## Supported operations and order
 
-Plans run in seven phases after any drops (see Drops above). Within each phase, normalized table/name order or sorted explicit rename order makes output deterministic.
+Plans run in the phases below, after view drops and any other drops (see Drops above), with enum changes before everything else and view creates after everything else. Within each phase, normalized table/name order or sorted explicit rename order makes output deterministic.
+
+First, drop_view drops the views the target leaves out, views whose query or depends_on changes, and every view that reads one of those or a table whose columns this plan renames, converts or drops (PostgreSQL refuses those changes while a view depends on them), last-created first. A view holds no data, so nothing is lost; each explanation says why the view goes.
+
+Then, after the other drops, create_enum (CREATE TYPE ... AS ENUM) and add_enum_value (ALTER TYPE ... ADD VALUE ... BEFORE or AFTER), which keeps the old values in order. PostgreSQL won't let the transaction that adds a value use it, so a plan whose new or changed default uses a value it adds is blocked: add the value in one plan and the default in the next. A view created in the same plan that names a new value fails the same way and rolls back.
 
 1. create_table: new tables with their columns (types, defaults, identity, nullability), primary key, unique constraints and check constraints.
 2. rename_column: explicit renames.
@@ -94,13 +98,15 @@ Plans run in seven phases after any drops (see Drops above). Within each phase, 
 6. add_unique and create_index: unique constraints and plain or unique indexes on new and existing tables. Building over existing rows fails if they contain duplicates.
 7. add_foreign_key: every new foreign key, after all tables, columns and referenced unique keys exist. On an existing table PostgreSQL checks every row and fails if any has no match.
 
+Last, create_view creates new views, and views dropped above that the target keeps, in dependency order. Each runs as `SET LOCAL search_path TO pg_catalog, "SCHEMA"; CREATE VIEW ...`, the search path inspection prints queries under; nothing after it depends on that search path.
+
 Any step that fails against real data (duplicates, NULLs, orphan rows) makes the whole transaction roll back; apply reports PostgreSQL's reason and SQLSTATE.
 
 Every schema, table, column, constraint and index identifier is quoted. Types and defaults come only from the normalized schema whitelist, not arbitrary SQL input. A plain plan builds indexes with ordinary CREATE INDEX, which blocks writes to the table while it runs; see Online plans below for building them concurrently. ALTER TABLE operations require table locks; --explain lists the tables apply will lock. Planning does not estimate lock duration or inspect row counts.
 
 A column rename carries the check constraints that use it along, as PostgreSQL does; the target lists them with the new name.
 
-Still blocked: dropping tables, columns, indexes, unique constraints, foreign keys or check constraints that the change file does not list, and any implicit rename; type conversions other than the widening above that the change file does not list; adding a required column without a default; adding an identity column to an existing table, or adding, removing or changing identity on an existing column; renaming an identity column; altering a primary key; and changing an index, unique constraint, foreign key or check constraint definition. Required columns are allowed on a newly created empty table. Target normalization rejects relation-name collisions before a plan is generated; since ready plans remove no relations, existing names cannot be silently recycled.
+Still blocked: removing or reordering enum values, dropping an enum, changing a column's type to, from or between enums and arrays; dropping tables, columns, indexes, unique constraints, foreign keys or check constraints that the change file does not list, and any implicit rename; type conversions other than the widening above that the change file does not list; adding a required column without a default; adding an identity column to an existing table, or adding, removing or changing identity on an existing column; renaming an identity column; altering a primary key; and changing an index, unique constraint, foreign key or check constraint definition. Required columns are allowed on a newly created empty table. Target normalization rejects relation-name collisions before a plan is generated; since ready plans remove no relations, existing names cannot be silently recycled.
 
 ## Online plans
 
@@ -110,7 +116,7 @@ An online plan runs in three phases, and --explain says so:
 
 1. one transaction for everything before the builds (new tables, renames, new columns, column changes), checked against the expected intermediate schema and committed;
 2. each concurrent build on its own, outside any transaction (operation kind create_index_concurrently);
-3. one transaction that attaches the unique constraints (attach_unique), adds the foreign keys, checks the full target and records history.
+3. one transaction that attaches the unique constraints (attach_unique), adds the foreign keys, creates the views, checks the full target and records history. View drops are in the first phase, so the views are missing while the indexes build.
 
 The online flag is part of the artifact: validation rebuilds the plan with the same flag, so changing it makes the plan fail validation. APPLY.md explains what happens when a phase fails.
 

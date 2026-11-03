@@ -1,0 +1,60 @@
+version: 1
+schema: store
+enums:
+- name: order_state
+  values: [open, paid, shipped]
+tables:
+- name: products
+  columns:
+  - name: id
+    type: bigint
+    identity: always
+  - name: sku
+    type: varchar(20)
+  - name: tags
+    type: text[]
+    default: "'{}'"
+  - name: price
+    type: numeric(10,2)
+  primary_key: [id]
+  unique:
+  - name: products_sku_key
+    columns: [sku]
+- name: orders
+  columns:
+  - name: id
+    type: bigint
+    identity: always
+  - name: product_id
+    type: bigint
+  - name: state
+    type: order_state
+    default: "'open'"
+  - name: quantity
+    type: integer
+    default: "1"
+  - name: notes
+    type: text[]
+    nullable: true
+  primary_key: [id]
+  indexes:
+  - name: orders_state_idx
+    columns: [state]
+  foreign_keys:
+  - name: orders_product_fkey
+    columns: [product_id]
+    references:
+      table: products
+      columns: [id]
+views:
+- name: open_orders
+  query: >-
+    SELECT o.id, o.quantity, p.sku, p.price
+    FROM orders o JOIN products p ON p.id = o.product_id
+    WHERE o.state = 'open'::order_state
+  depends_on: [orders, products]
+- name: open_totals
+  query: >-
+    SELECT sku, sum(quantity::numeric * price) AS amount, count(*) AS orders
+    FROM open_orders GROUP BY sku
+  depends_on: [open_orders]
