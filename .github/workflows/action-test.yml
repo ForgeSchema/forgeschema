@@ -1,7 +1,8 @@
 name: action-test
 
 # Runs the GitHub Action in this repo (action.yml) with a forgeschema built
-# from this commit, against a PostgreSQL service: a plan from an empty schema
+# from this commit, against a PostgreSQL 17 service (0.3.0, used for the
+# download path, knows 16 and 17 only; the test workflow covers 18): a plan from an empty schema
 # (ready), the same after apply (no changes), verify (match), a blocked plan
 # (reported, then failing), drift after a hand edit (failing), an unreachable
 # database and a bad switch (both failing), plus the download path for a
@@ -36,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18
+        image: postgres:17
         env:
           POSTGRES_USER: forgeschema
           POSTGRES_PASSWORD: local_test_only
@@ -185,7 +186,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     services:
       postgres:
-        image: postgres:18
+        image: postgres:17
         env:
           POSTGRES_USER: forgeschema
           POSTGRES_PASSWORD: local_test_only
