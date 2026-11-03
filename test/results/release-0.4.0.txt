@@ -1,0 +1,59 @@
+# ForgeSchema 0.4.0 release check, 2026-11-03 19:22 UTC
+# release run 41702014471 from commit 817dbb7; binary downloaded from the v0.4.0 release (forgeschema_linux_amd64.tar.gz); PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+
+## Assets at the tag and at latest
+forgeschema_darwin_amd64.tar.gz: OK
+forgeschema_darwin_arm64.tar.gz: OK
+forgeschema_linux_amd64.tar.gz: OK
+forgeschema_linux_arm64.tar.gz: OK
+forgeschema_windows_amd64.zip: OK
+forgeschema_windows_arm64.zip: OK
+the seven files at the tag and at latest are byte-identical
+
+## version
+0.4.0
+
+## inspect, plan from the empty schema to examples/store.yaml
+plan exit 0
+1. Create enum type order_state with 3 values, before the tables that use it.
+2. Create a new table with its declared columns, primary key and unique constraints; indexes and foreign keys follow separately.
+3. Create a new table with its declared columns, primary key and unique constraints; indexes and foreign keys follow separately.
+4. Create an ordinary btree index after table and column changes. This is not concurrent and can block writes.
+5. Add a foreign key after all tables exist. The new table is empty, so validation is immediate.
+6. Create view open_orders, which reads orders, products, after every other change. A view stores no data; PostgreSQL checks its query against what it reads.
+7. Create view open_totals, which reads open_orders, after every other change. A view stores no data; PostgreSQL checks its query against what it reads.
+
+## apply
+{"status":"applied","plan_id":"ee7151c41e72127e0ca68d8222a261282c982bea67137813d5f6bf16310781f9","migration_id":"e091fe9f9a98bf887094e6eb07d2409d","operations":7,"target_fingerprint":"45cb4deae58ea32b5ad1cf6f9d7e8b25ae6d42cd65455fac6da8774155afebce"}
+apply exit 0
+
+## verify
+{"status":"match","schema":"store","expected_fingerprint":"45cb4deae58ea32b5ad1cf6f9d7e8b25ae6d42cd65455fac6da8774155afebce","actual_fingerprint":"45cb4deae58ea32b5ad1cf6f9d7e8b25ae6d42cd65455fac6da8774155afebce","differences":[]}
+verify exit 0
+
+## the views work
+A-1|12.50|2
+B-2|4.00|1
+
+## a change under the views: rename orders.quantity to qty, and a new enum value
+plan exit 0
+1. Drop view open_totals, which reads open_orders, so the changes there can go ahead; it is created again after them. A view holds no data, so nothing is lost.
+2. Drop view open_orders so it can be created again with its new definition. A view holds no data, so nothing is lost.
+3. Add value 'returned' to enum order_state. Existing rows keep their values. PostgreSQL won't let the same transaction use the new value, so no default or view in this plan may name it.
+4. Explicitly rename quantity to qty; PostgreSQL retains column data and updates existing key/index references. Requires a table lock.
+5. Create view open_orders again, which reads orders, products, after every other change. A view stores no data; PostgreSQL checks its query against what it reads.
+6. Create view open_totals again, which reads open_orders, after every other change. A view stores no data; PostgreSQL checks its query against what it reads.
+{"status":"applied","plan_id":"f4d808d7a95e75ae35b3a19c738094430ef03441722c10ac7cc97703c8c81cea","migration_id":"f3659bcec5b21e8604eb15021f6a04ed","operations":6,"target_fingerprint":"64b4e0942d4d8981f2015aae220f5136f40c7d18125f060c4b83dc25b760dce9"}
+apply exit 0
+{"status":"match","schema":"store","expected_fingerprint":"6
+verify exit 0
+A-1|12.50|2
+B-2|4.00|1
+
+## a view query written another way is refused at apply, with the stored form
+forgeschema: target schema fingerprint mismatch: expected e4776a685945884a87cbc4eacc44b9f7d65017511b74a4536956baedf6113322, got ec560342ca24d99066949a9deab31f93b7d7325c830c7d8a5af777f455eb6f05; view open_orders: PostgreSQL stores the query as "SELECT o.id, o.qty AS quantity, p.sku, p.price FROM orders o JOIN products p ON p.id = o.product_id WHERE o.state = 'open'::order_state AND o.qty > 0", so write it that way in the target; the result did not match the reviewed target, so nothing was committed. Check for concurrent DDL, then inspect again
+apply exit 5
+
+## the store schema after the refused apply still matches next.yaml
+{"status":"match","schema":"store","expected_fingerprint":"6
+verify exit 0

@@ -17,6 +17,8 @@ The owner's part is the go-ahead on what to build. Everything else (code, tests,
 
 ## Where it stands
 
+ForgeSchema 0.4.0 is released (enums, arrays, plain views, PostgreSQL 18, the GitHub Action); the site post and studio note are step 8 below.
+
 The plan agreed with the owner on 2026-10-18 is done and went out as 0.3.0:
 
 1. The low maintenance workflow: automated releases, this file, recorded results.
@@ -73,7 +75,7 @@ Steps:
 6. [x] Independent review, two rounds, fixes, fresh test/results.
    Review round 1, no blockers. Should-fix, all fixed with tests: an enum named with a keyword (order, user) couldn't round-trip a default, since PostgreSQL quotes only that part of the cast (shop."order"); a view naming an enum value the same plan adds got a ready plan that always failed at apply (now blocked like a default, explanation reworded); README limits still listed views, arrays and enums; the Action's macOS, Windows and download paths had never run (an install job on push now runs them with v0.3.0). Left, documented in APPLY.md: views aren't locked up front, since LOCK TABLE on a view locks its base tables too, so a reader of a dropped view can deadlock with apply (one side is cancelled, nothing committed). Nits fixed: enum values refuse backslashes; the comment fence is longer than any backtick run; the version output is the resolved tag; fallback to latest only when the own release is a 404; a PostgreSQL 18 test that NOT ENFORCED checks and foreign keys are refused. Left: no --explain warning that online plans leave views missing during the builds (in PLANNING.md); whitespace collapsing can turn a multi-line string concatenation into a syntax error (refused at apply).
    Review round 2: the round 1 fixes hold; one should-fix, fixed: the new view check matched 'a'::status inside 'a'::status_old, so it now reads every literal and its cast (plan/enumcast.go), catching array and schema-qualified casts too. Nits fixed: a repeated word in README, INSPECTION.md names the backslash rejection for enum values. Fresh test/results recorded locally (Go 1.24, scratch go.mod, PostgreSQL 16.15); CI runs 16, 17 and 18.
-7. [ ] 0.4.0 released by the workflow; assets checked at the tag and latest; downloaded binary run.
+7. [x] 0.4.0 released by the workflow (commit 817dbb7, release run 41702014471). All six archives match SHA256SUMS at the tag and at latest, byte-identical. The downloaded Linux binary printed 0.4.0, planned, applied and verified examples/store.yaml from an empty schema (7 operations), then renamed orders.quantity under both views and added an enum value (views dropped and created again, totals unchanged), and refused a view query in another form with exit 5 and the stored form. Record in test/results/release-0.4.0.txt. The action-test download jobs run on the published binaries after the release.
 8. [ ] forgeschema.com post and pages; softdevstudio.com note; softdev-plan item 24 done.
 
 Local note: this cloud session has Go 1.24 and no Go module proxy. Local runs use a scratch modfile with go 1.24 and the two dependencies cloned from GitHub (`GOFLAGS=-modfile=...`), against a disposable PostgreSQL 16.15. CI is the real check, and the only one for 17 and 18.
